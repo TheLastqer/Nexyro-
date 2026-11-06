@@ -1,0 +1,593 @@
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+local Stats = game:GetService("Stats")
+local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+local VERIFIED = "\u{E000}"
+local Window = WindUI:CreateWindow({
+    Title = "Cut A Rock",
+    Author = "by Nexyro " .. VERIFIED,
+    Icon = "radio",
+    Theme = "Dark",
+    Size = UDim2.fromOffset(550, 430),
+    HideSearchBar = false,
+    User = {Enabled = true, Anonymous = false},
+    ToggleKey = Enum.KeyCode.RightControl,
+})
+local function addTag(title, color, icon)
+    local tag
+    local ok = pcall(function()
+        tag = Window:Tag({Title = title, Icon = icon, Color = Color3.fromHex(color), Radius = 13})
+    end)
+    if not ok or not tag then
+        pcall(function()
+            tag = Window:Tag({Title = title, Color = Color3.fromHex(color)})
+        end)
+    end
+    return tag
+end
+local PingTag = addTag("-- MS", "#3b82f6", "badge-check")
+addTag("v1.0", "#30ff6a", "github")
+addTag("BETA", "#f59e0b", "flask-conical")
+local function notify(title, content)
+    pcall(function()
+        WindUI:Notify({Title = title, Content = content, Duration = 4})
+    end)
+end
+notify("Cut A Rock v1.0", "Loaded successfully (Beta) - by Nexyro " .. VERIFIED)
+local function getPing()
+    local ok, value = pcall(function()
+        return Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
+    end)
+    if ok and value then return math.floor(value) end
+    return nil
+end
+local Home = Window:Tab({Title = "Home", Icon = "house"})
+Window:Divider()
+Home:Section({Title = "PROFILE"})
+Home:Paragraph({Title = "Welcome, " .. Player.DisplayName, Desc = "Your Roblox profile information.", Image = "user-round"})
+Home:Paragraph({
+    Title = "Player Information",
+    Desc = "Username: @" .. Player.Name
+        .. "\nDisplay Name: " .. Player.DisplayName
+        .. "\nUser ID: " .. Player.UserId
+        .. "\nAccount Age: " .. Player.AccountAge .. " days",
+    Image = "circle-user",
+})
+Home:Section({Title = "GAME INFORMATION"})
+local success, gameInfo = pcall(function()
+    return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId)
+end)
+Home:Paragraph({
+    Title = "Current Game",
+    Desc = "Game Name: " .. (success and gameInfo.Name or "Unknown")
+        .. "\nGame ID: " .. game.PlaceId
+        .. "\nPlace ID: " .. game.PlaceId,
+    Image = "gamepad-2",
+})
+Home:Section({Title = "SESSION"})
+local startTime = os.clock()
+local SessionParagraph = Home:Paragraph({Title = "Time Playing", Desc = "00:00:00", Image = "clock"})
+local PingParagraph = Home:Paragraph({Title = "Ping", Desc = "-- MS", Image = "wifi"})
+task.spawn(function()
+    local tick = 0
+    while task.wait(1) do
+        tick = tick + 1
+        local elapsed = math.floor(os.clock() - startTime)
+        SessionParagraph:SetDesc(string.format("%02d:%02d:%02d", math.floor(elapsed / 3600), math.floor((elapsed % 3600) / 60), elapsed % 60))
+        if tick % 3 == 0 then
+            local ping = getPing()
+            if ping then
+                pcall(function() PingParagraph:SetDesc(ping .. " MS") end)
+                pcall(function() PingTag:SetTitle(ping .. " MS") end)
+                local color = "#30ff6a"
+                if ping >= 150 then
+                    color = "#ef4444"
+                elseif ping >= 80 then
+                    color = "#f59e0b"
+                end
+                pcall(function() PingTag:SetColor(Color3.fromHex(color)) end)
+            end
+        end
+    end
+end)
+Home:Section({Title = "INFO"})
+Home:Paragraph({Title = "Info - Beta", Desc = "Version: 1.0\nStatus: BETA\nSome features may change or be updated.", Image = "info"})
+Home:Section({Title = "CREDITS"})
+Home:Paragraph({Title = "Credit By Nexyro " .. VERIFIED, Desc = "Designed and developed by Nexyro " .. VERIFIED, Image = "radio"})
+
+local Features = Window:Tab({Title = "Main Features", Icon = "zap"})
+Window:Divider()
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Settings = {
+    WalkSpeedEnabled = false,
+    WalkSpeed = 16,
+    FlyEnabled = false,
+    FlySpeed = 50,
+    AutoHop = false,
+    HopInterval = 120,
+    AutoRejoin = false,
+    FarmEnabled = false,
+    CollectCount = 5,
+    UseCollectCount = true,
+    AutoBuyEyesight = false,
+    AutoBuyPocket = false,
+    AutoBuyPickaxe = false,
+}
+local Elements = {}
+local Appliers = {}
+local function getHumanoid()
+    local character = Player.Character
+    return character and character:FindFirstChildOfClass("Humanoid")
+end
+local function getRoot()
+    local character = Player.Character
+    return character and character:FindFirstChild("HumanoidRootPart")
+end
+
+-- ================= MAIN FEATURES TAB: AUTO FARM =================
+Features:Section({Title = "AUTO FARM"})
+
+local TARGET_ROOM = "Room_39"
+local PROMPT_NAME = "ToplaPrompt"
+local HEIGHT_OFFSET = 4
+local MAX_STAY = 12
+local FIRE_DELAY = 0.15
+
+local farmToken = 0
+local collected = 0
+local lastMinePos = nil
+local lastDebug = 0
+
+local function getPromptPos(prompt)
+    local parent = prompt.Parent
+    if not parent then return nil end
+    if parent:IsA("BasePart") then return parent.Position
+    elseif parent:IsA("Attachment") then return parent.WorldPosition
+    elseif parent:IsA("Model") then return parent:GetPivot().Position end
+    local model = parent:FindFirstAncestorWhichIsA("Model")
+    if model then return model:GetPivot().Position end
+    return nil
+end
+
+local function getRoomPos(room)
+    if room:IsA("Model") then return room:GetPivot().Position end
+    if room:IsA("BasePart") then return room.Position end
+    local part = room:FindFirstChildWhichIsA("BasePart", true)
+    if part then return part.Position end
+    return nil
+end
+
+local function promptAlive(prompt)
+    return prompt and prompt.Parent and prompt:IsDescendantOf(workspace) and prompt.Enabled
+end
+
+local function findRoomPrompt()
+    local rooms = workspace:FindFirstChild("Rooms")
+    if not rooms then return nil end
+    local room = rooms:FindFirstChild(TARGET_ROOM)
+    if not room then return nil end
+    local rocks = room:FindFirstChild("Rocks")
+    if not rocks then return nil end
+    for _, inst in ipairs(rocks:GetDescendants()) do
+        if inst:IsA("ProximityPrompt") and inst.Name == PROMPT_NAME and inst.Enabled then
+            return inst
+        end
+    end
+    return nil
+end
+
+local function triggerPrompt(prompt)
+    pcall(function() prompt.HoldDuration = 0 end)
+    pcall(function() prompt.RequiresLineOfSight = false end)
+    if typeof(fireproximityprompt) == "function" then
+        pcall(fireproximityprompt, prompt)
+    else
+        pcall(function()
+            prompt:InputHoldBegin()
+            task.wait(0.05)
+            prompt:InputHoldEnd()
+        end)
+    end
+end
+
+local function parseCount(text)
+    text = tostring(text):gsub("<[^>]+>", "")
+    local cur, max = text:match("(%d+)%s*/%s*(%d+)")
+    if cur and max then return tonumber(cur), tonumber(max) end
+end
+
+local function getCepBar()
+    local ok, bar = pcall(function() return Player.PlayerGui.MainHUD.CepBar end)
+    if ok then return bar end
+    return nil
+end
+
+local function isCepFull()
+    local bar = getCepBar()
+    if not bar then return false end
+    local function check(obj)
+        if obj:IsA("TextLabel") or obj:IsA("TextButton") then
+            local cur, max = parseCount(obj.Text)
+            if cur and max and max > 0 then return cur >= max end
+            local t = obj.Text:lower()
+            if t:find("full", 1, true) or t:find("max", 1, true) then return true end
+        end
+        return nil
+    end
+    local r = check(bar)
+    if r ~= nil then return r end
+    for _, d in ipairs(bar:GetDescendants()) do
+        local res = check(d)
+        if res ~= nil then return res end
+    end
+    for _, d in ipairs(bar:GetDescendants()) do
+        if d:IsA("Frame") and (d.Name:lower():find("fill") or d.Name:lower():find("bar")) then
+            if d.Size.X.Scale >= 0.99 then return true end
+        end
+    end
+    return false
+end
+
+local function fireRemote(value)
+    pcall(function()
+        local event = ReplicatedStorage:FindFirstChild("RebornEvent")
+        if event then event:FireServer(value) end
+    end)
+end
+
+local function teleportTo(target)
+    local character = Player.Character
+    if not character then return false end
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if not root then return false end
+    pcall(function()
+        character:PivotTo(CFrame.new(target))
+    end)
+    return true
+end
+
+local function startFarm()
+    farmToken = farmToken + 1
+    local myToken = farmToken
+    collected = 0
+    task.spawn(function()
+        local function active()
+            return Settings.FarmEnabled and farmToken == myToken
+        end
+
+        local function returnToRock()
+            local waitChar = 0
+            while active() and not getRoot() and waitChar < 10 do
+                task.wait(0.25)
+                waitChar = waitChar + 0.25
+            end
+            task.wait(0.5)
+            if active() and lastMinePos then
+                teleportTo(lastMinePos)
+            end
+        end
+
+        while active() do
+            local target = math.max(1, math.floor(tonumber(Settings.CollectCount) or 5))
+
+            if isCepFull() then
+                local tries = 0
+                while active() and isCepFull() and tries < 20 do
+                    fireRemote(true)
+                    tries = tries + 1
+                    task.wait(0.5)
+                end
+                collected = 0
+                returnToRock()
+
+            elseif Settings.UseCollectCount and collected >= target then
+                fireRemote(false)
+                collected = 0
+                task.wait(0.5)
+                returnToRock()
+
+            else
+                local root = getRoot()
+                if not root then
+                    task.wait(0.5)
+                else
+                    local prompt = findRoomPrompt()
+
+                    if not prompt then
+                        local rooms = workspace:FindFirstChild("Rooms")
+                        local room = rooms and rooms:FindFirstChild(TARGET_ROOM)
+                        if room then
+                            local rpos = getRoomPos(room)
+                            if rpos and (root.Position - rpos).Magnitude > 30 then
+                                teleportTo(rpos + Vector3.new(0, HEIGHT_OFFSET, 0))
+                            end
+                        end
+                        if os.clock() - lastDebug > 15 then
+                            lastDebug = os.clock()
+                            notify("Auto Farm", "Waiting for ToplaPrompt in Room_39.Rocks...")
+                        end
+                        task.wait(1)
+                    else
+                        local promptPos = getPromptPos(prompt)
+                        if promptPos then
+                            local dest = promptPos + Vector3.new(0, HEIGHT_OFFSET, 0)
+                            lastMinePos = dest
+                            teleportTo(dest)
+                            task.wait(0.2)
+
+                            local waited = 0
+                            local triggered = false
+                            while active() and promptAlive(prompt) and not isCepFull() and waited < MAX_STAY do
+                                triggerPrompt(prompt)
+                                triggered = true
+                                task.wait(FIRE_DELAY)
+                                waited = waited + FIRE_DELAY
+                            end
+                            if triggered and not promptAlive(prompt) then
+                                collected = collected + 1
+                            end
+                        else
+                            task.wait(0.5)
+                        end
+                    end
+                end
+            end
+            task.wait()
+        end
+    end)
+end
+
+Appliers.CollectCount = function(value)
+    local n = tonumber(value)
+    if n and n >= 1 then
+        Settings.CollectCount = math.floor(n)
+    end
+end
+Appliers.UseCollectCount = function(value)
+    Settings.UseCollectCount = value
+    if not value then collected = 0 end
+end
+Appliers.FarmEnabled = function(value)
+    Settings.FarmEnabled = value
+    if value then
+        startFarm()
+    else
+        farmToken = farmToken + 1
+    end
+end
+
+Elements.FarmEnabled = Features:Toggle({
+    Title = "Auto Farm",
+    Default = false,
+    Callback = function(value) Appliers.FarmEnabled(value) end,
+})
+Elements.CollectCount = Features:Input({
+    Title = "Collect Rocks Before Teleport Back",
+    Placeholder = "Example: 5",
+    Value = tostring(Settings.CollectCount),
+    Callback = function(text) Appliers.CollectCount(text) end,
+})
+Elements.UseCollectCount = Features:Toggle({
+    Title = "Enable Collect Count",
+    Default = true,
+    Callback = function(value) Appliers.UseCollectCount(value) end,
+})
+
+-- ================= AUTO UPGRADE SECTION =================
+Features:Section({Title = "AUTO UPGRADE"})
+
+local upgradeEvent = nil
+local function getUpgradeEvent()
+    if upgradeEvent and upgradeEvent.Parent then
+        return upgradeEvent
+    end
+    local ok, ev = pcall(function()
+        return ReplicatedStorage:FindFirstChild("UpgradeEvent")
+    end)
+    if ok and ev then
+        upgradeEvent = ev
+        return ev
+    end
+    return nil
+end
+
+local function fireUpgrade(name)
+    local ev = getUpgradeEvent()
+    if not ev then return false end
+    return pcall(function()
+        ev:FireServer(name, 1)
+    end)
+end
+
+local eyesightToken = 0
+Appliers.AutoBuyEyesight = function(value)
+    Settings.AutoBuyEyesight = value
+    eyesightToken = eyesightToken + 1
+    if value then
+        local myToken = eyesightToken
+        task.spawn(function()
+            while Settings.AutoBuyEyesight and eyesightToken == myToken do
+                fireUpgrade("Eyesight")
+                task.wait(1)
+            end
+        end)
+    end
+end
+
+local pocketToken = 0
+Appliers.AutoBuyPocket = function(value)
+    Settings.AutoBuyPocket = value
+    pocketToken = pocketToken + 1
+    if value then
+        local myToken = pocketToken
+        task.spawn(function()
+            while Settings.AutoBuyPocket and pocketToken == myToken do
+                fireUpgrade("Pocket")
+                task.wait(1)
+            end
+        end)
+    end
+end
+
+-- >>> AUTO BUY PICKAXE (2 -> 33)
+local pickaxeEvent = nil
+local function getPickaxeEvent()
+    if pickaxeEvent and pickaxeEvent.Parent then
+        return pickaxeEvent
+    end
+    local ok, ev = pcall(function()
+        return ReplicatedStorage:FindFirstChild("PickaxeBuyEvent")
+    end)
+    if ok and ev then
+        pickaxeEvent = ev
+        return ev
+    end
+    return nil
+end
+
+local PICKAXE_MIN = 2
+local PICKAXE_MAX = 33
+local PICKAXE_DELAY = 0.1
+
+local pickaxeToken = 0
+Appliers.AutoBuyPickaxe = function(value)
+    Settings.AutoBuyPickaxe = value
+    pickaxeToken = pickaxeToken + 1
+    if value then
+        local myToken = pickaxeToken
+        task.spawn(function()
+            while Settings.AutoBuyPickaxe and pickaxeToken == myToken do
+                local ev = getPickaxeEvent()
+                if ev then
+                    for i = PICKAXE_MIN, PICKAXE_MAX do
+                        if not (Settings.AutoBuyPickaxe and pickaxeToken == myToken) then break end
+                        pcall(function() ev:FireServer(i) end)
+                        task.wait(PICKAXE_DELAY)
+                    end
+                end
+                task.wait(1)
+            end
+        end)
+    end
+end
+
+Elements.AutoBuyEyesight = Features:Toggle({
+    Title = "Auto Buy Eyesight",
+    Default = false,
+    Callback = function(value) Appliers.AutoBuyEyesight(value) end,
+})
+Elements.AutoBuyPocket = Features:Toggle({
+    Title = "Auto Buy Pocket",
+    Default = false,
+    Callback = function(value) Appliers.AutoBuyPocket(value) end,
+})
+Elements.AutoBuyPickaxe = Features:Toggle({
+    Title = "Auto Buy Pickaxe",
+    Default = false,
+    Callback = function(value) Appliers.AutoBuyPickaxe(value) end,
+})
+
+-- ================= PLAYER TAB =================
+local Players_Tab = Window:Tab({Title = "Player", Icon = "user"})
+Window:Divider()
+Players_Tab:Section({Title = "WALK SPEED"})
+Appliers.WalkSpeed = function(value)
+    Settings.WalkSpeed = value
+end
+Appliers.WalkSpeedEnabled = function(value)
+    Settings.WalkSpeedEnabled = value
+    if not value then
+        local hum = getHumanoid()
+        if hum then hum.WalkSpeed = 16 end
+    end
+end
+Elements.WalkSpeed = Players_Tab:Slider({
+    Title = "Speed",
+    Step = 1,
+    Value = {Min = 1, Max = 250, Default = Settings.WalkSpeed},
+    Callback = function(value) Appliers.WalkSpeed(value) end,
+})
+Elements.WalkSpeedEnabled = Players_Tab:Toggle({
+    Title = "Enable Speed",
+    Default = false,
+    Callback = function(value) Appliers.WalkSpeedEnabled(value) end,
+})
+RunService.Heartbeat:Connect(function()
+    if Settings.WalkSpeedEnabled then
+        local hum = getHumanoid()
+        if hum and hum.WalkSpeed ~= Settings.WalkSpeed then
+            hum.WalkSpeed = Settings.WalkSpeed
+        end
+    end
+end)
+Players_Tab:Section({Title = "FLY"})
+local flyConnection, flyVelocity, flyGyro
+local function stopFly()
+    if flyConnection then flyConnection:Disconnect() flyConnection = nil end
+    if flyVelocity then flyVelocity:Destroy() flyVelocity = nil end
+    if flyGyro then flyGyro:Destroy() flyGyro = nil end
+    local hum = getHumanoid()
+    if hum then hum.PlatformStand = false end
+end
+local function startFly()
+    stopFly()
+    flyConnection = RunService.RenderStepped:Connect(function()
+        local root = getRoot()
+        local hum = getHumanoid()
+        local camera = workspace.CurrentCamera
+        if not root or not hum or not camera then return end
+        if not flyVelocity or flyVelocity.Parent ~= root then
+            if flyVelocity then flyVelocity:Destroy() end
+            flyVelocity = Instance.new("BodyVelocity")
+            flyVelocity.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+            flyVelocity.Velocity = Vector3.zero
+            flyVelocity.Parent = root
+        end
+        if not flyGyro or flyGyro.Parent ~= root then
+            if flyGyro then flyGyro:Destroy() end
+            flyGyro = Instance.new("BodyGyro")
+            flyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+            flyGyro.P = 9e4
+            flyGyro.Parent = root
+        end
+        hum.PlatformStand = true
+        flyGyro.CFrame = camera.CFrame
+        local direction = Vector3.zero
+        local move = hum.MoveDirection
+        if move.Magnitude > 0 then
+            local relative = camera.CFrame:VectorToObjectSpace(move)
+            direction = direction + camera.CFrame.RightVector * relative.X + camera.CFrame.LookVector * (-relative.Z)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            direction = direction + Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+            direction = direction - Vector3.new(0, 1, 0)
+        end
+        if direction.Magnitude > 0 then
+            flyVelocity.Velocity = direction.Unit * Settings.FlySpeed
+        else
+            flyVelocity.Velocity = Vector3.zero
+        end
+    end)
+end
+Appliers.FlySpeed = function(value) Settings.FlySpeed = value end
+Appliers.FlyEnabled = function(value)
+    Settings.FlyEnabled = value
+    if value then startFly() else stopFly() end
+end
+Elements.FlySpeed = Players_Tab:Slider({
+    Title = "Fly Speed",
+    Step = 1,
+    Value = {Min = 1, Max = 250, Default = Settings.FlySpeed},
+    Callback = function(value) Appliers.FlySpeed(value) end,
+})
+Elements.FlyEnabled = Players_Tab:Toggle({
+    Title = "Enable Fly",
+    Default = false,
+    Callback = function(value) Appliers
