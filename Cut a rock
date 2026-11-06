@@ -1,8 +1,10 @@
+
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 local Stats = game:GetService("Stats")
 local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
 local VERIFIED = "\u{E000}"
+local VERSION = "v1.1"
 local Window = WindUI:CreateWindow({
     Title = "Cut A Rock",
     Author = "by Nexyro " .. VERIFIED,
@@ -26,14 +28,13 @@ local function addTag(title, color, icon)
     return tag
 end
 local PingTag = addTag("-- MS", "#3b82f6", "badge-check")
-addTag("v1.0", "#30ff6a", "github")
-addTag("BETA", "#f59e0b", "flask-conical")
+addTag(VERSION, "#30ff6a", "github")
 local function notify(title, content)
     pcall(function()
         WindUI:Notify({Title = title, Content = content, Duration = 4})
     end)
 end
-notify("Cut A Rock v1.0", "Loaded successfully (Beta) - by Nexyro " .. VERIFIED)
+notify("Cut A Rock " .. VERSION, "Loaded successfully - by Nexyro " .. VERIFIED)
 local function getPing()
     local ok, value = pcall(function()
         return Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
@@ -41,6 +42,8 @@ local function getPing()
     if ok and value then return math.floor(value) end
     return nil
 end
+
+-- ================= HOME TAB =================
 local Home = Window:Tab({Title = "Home", Icon = "house"})
 Window:Divider()
 Home:Section({Title = "PROFILE"})
@@ -91,9 +94,30 @@ task.spawn(function()
     end
 end)
 Home:Section({Title = "INFO"})
-Home:Paragraph({Title = "Info - Beta", Desc = "Version: 1.0\nStatus: BETA\nSome features may change or be updated.", Image = "info"})
+Home:Paragraph({Title = "Cut A Rock " .. VERSION, Desc = "Version: 1.1\nStatus: Stable Release", Image = "info"})
 Home:Section({Title = "CREDITS"})
 Home:Paragraph({Title = "Credit By Nexyro " .. VERIFIED, Desc = "Designed and developed by Nexyro " .. VERIFIED, Image = "radio"})
+
+-- ================= UPDATES TAB =================
+local UpdatesTab = Window:Tab({Title = "Updates", Icon = "megaphone"})
+Window:Divider()
+UpdatesTab:Section({Title = "LATEST UPDATE"})
+UpdatesTab:Paragraph({
+    Title = "V1.1",
+    Desc = "[+] Added 20 room selections to Auto Farm\n"
+        .. "[+] Added teleport to spawn after your collect amount\n"
+        .. "[+] Added Updates window\n"
+        .. "[-] Removed Beta status and tag\n"
+        .. "[*] Improved Auto Farm stability",
+    Image = "sparkles",
+})
+UpdatesTab:Section({Title = "PREVIOUS UPDATES"})
+UpdatesTab:Paragraph({
+    Title = "V1.0 RELEASE",
+    Desc = "[+] Initial release\n"
+        .. "[+] Auto Farm, Auto Upgrade, Player tools and Config system",
+    Image = "rocket",
+})
 
 local Features = Window:Tab({Title = "Main Features", Icon = "zap"})
 Window:Divider()
@@ -112,8 +136,8 @@ local Settings = {
     HopInterval = 120,
     AutoRejoin = false,
     FarmEnabled = false,
-    CollectCount = 5,
-    UseCollectCount = true,
+    FarmRoom = "Supreme",
+    CollectCount = 1,
     AutoBuyEyesight = false,
     AutoBuyPocket = false,
     AutoBuyPickaxe = false,
@@ -132,9 +156,36 @@ end
 -- ================= MAIN FEATURES TAB: AUTO FARM =================
 Features:Section({Title = "AUTO FARM"})
 
-local TARGET_ROOM = "Room_39"
+local ROOMS = {
+    Common = "Room_0",
+    Uncommon = "Room_3",
+    Rare = "Room_5",
+    Elite = "Room_7",
+    Epic = "Room_9",
+    Legendary = "Room_10",
+    Mythic = "Room_11",
+    Divine = "Room_15",
+    Ancient = "Room_17",
+    Immortal = "Room_19",
+    Eternal = "Room_21",
+    Secret = "Room_23",
+    Hidden = "Room_26",
+    Forbidden = "Room_25",
+    Unknown = "Room_29",
+    Ascended = "Room_32",
+    Cosmic = "Room_32",
+    Ethereal = "Room_34",
+    Primal = "Room_37",
+    Supreme = "Room_39",
+}
+local ROOM_LIST = {
+    "Common", "Uncommon", "Rare", "Elite", "Epic", "Legendary", "Mythic",
+    "Divine", "Ancient", "Immortal", "Eternal", "Secret", "Hidden", "Forbidden",
+    "Unknown", "Ascended", "Cosmic", "Ethereal", "Primal", "Supreme",
+}
 local PROMPT_NAME = "ToplaPrompt"
 local HEIGHT_OFFSET = 4
+local SPAWN_HEIGHT = 5
 local MAX_STAY = 12
 local FIRE_DELAY = 0.15
 
@@ -142,6 +193,10 @@ local farmToken = 0
 local collected = 0
 local lastMinePos = nil
 local lastDebug = 0
+
+local function getTargetRoom()
+    return ROOMS[Settings.FarmRoom] or ROOMS.Supreme
+end
 
 local function getPromptPos(prompt)
     local parent = prompt.Parent
@@ -162,23 +217,41 @@ local function getRoomPos(room)
     return nil
 end
 
+local function getSpawnPos()
+    local folder = workspace:FindFirstChild("SpawnAlani")
+    local spawnPart = folder and folder:FindFirstChild("SpawnLocation")
+    if spawnPart and spawnPart:IsA("BasePart") then
+        return spawnPart.Position + Vector3.new(0, SPAWN_HEIGHT, 0)
+    end
+    return nil
+end
+
 local function promptAlive(prompt)
     return prompt and prompt.Parent and prompt:IsDescendantOf(workspace) and prompt.Enabled
 end
 
+-- finds the closest enabled prompt inside the selected room only
 local function findRoomPrompt()
     local rooms = workspace:FindFirstChild("Rooms")
     if not rooms then return nil end
-    local room = rooms:FindFirstChild(TARGET_ROOM)
+    local room = rooms:FindFirstChild(getTargetRoom())
     if not room then return nil end
-    local rocks = room:FindFirstChild("Rocks")
-    if not rocks then return nil end
-    for _, inst in ipairs(rocks:GetDescendants()) do
+    local container = room:FindFirstChild("Rocks") or room
+
+    local root = getRoot()
+    local best, bestDist = nil, math.huge
+    for _, inst in ipairs(container:GetDescendants()) do
         if inst:IsA("ProximityPrompt") and inst.Name == PROMPT_NAME and inst.Enabled then
-            return inst
+            local pos = getPromptPos(inst)
+            if pos then
+                local dist = root and (root.Position - pos).Magnitude or 0
+                if dist < bestDist then
+                    best, bestDist = inst, dist
+                end
+            end
         end
     end
-    return nil
+    return best
 end
 
 local function triggerPrompt(prompt)
@@ -255,6 +328,7 @@ local function startFarm()
     farmToken = farmToken + 1
     local myToken = farmToken
     collected = 0
+    lastMinePos = nil
     task.spawn(function()
         local function active()
             return Settings.FarmEnabled and farmToken == myToken
@@ -273,9 +347,10 @@ local function startFarm()
         end
 
         while active() do
-            local target = math.max(1, math.floor(tonumber(Settings.CollectCount) or 5))
+            local target = math.max(1, math.floor(tonumber(Settings.CollectCount) or 1))
 
             if isCepFull() then
+                -- bag full: send back to spawn
                 local tries = 0
                 while active() and isCepFull() and tries < 20 do
                     fireRemote(true)
@@ -285,7 +360,15 @@ local function startFarm()
                 collected = 0
                 returnToRock()
 
-            elseif Settings.UseCollectCount and collected >= target then
+            elseif collected >= target then
+                -- reached the typed amount: teleport to spawn, then return to the rocks
+                local spawnPos = getSpawnPos()
+                if spawnPos then
+                    teleportTo(spawnPos)
+                else
+                    notify("Auto Farm", "SpawnLocation not found in workspace.SpawnAlani.")
+                end
+                task.wait(0.5)
                 fireRemote(false)
                 collected = 0
                 task.wait(0.5)
@@ -300,7 +383,7 @@ local function startFarm()
 
                     if not prompt then
                         local rooms = workspace:FindFirstChild("Rooms")
-                        local room = rooms and rooms:FindFirstChild(TARGET_ROOM)
+                        local room = rooms and rooms:FindFirstChild(getTargetRoom())
                         if room then
                             local rpos = getRoomPos(room)
                             if rpos and (root.Position - rpos).Magnitude > 30 then
@@ -309,7 +392,7 @@ local function startFarm()
                         end
                         if os.clock() - lastDebug > 15 then
                             lastDebug = os.clock()
-                            notify("Auto Farm", "Waiting for ToplaPrompt in Room_39.Rocks...")
+                            notify("Auto Farm", "Waiting for rocks in " .. tostring(Settings.FarmRoom) .. " (" .. getTargetRoom() .. ")...")
                         end
                         task.wait(1)
                     else
@@ -342,15 +425,22 @@ local function startFarm()
     end)
 end
 
+Appliers.FarmRoom = function(value)
+    if type(value) == "table" then value = value[1] end
+    if not ROOMS[value] then return end
+    Settings.FarmRoom = value
+    -- switching room mid-farm: reset and restart so it teleports to the new room
+    collected = 0
+    lastMinePos = nil
+    if Settings.FarmEnabled then
+        startFarm()
+    end
+end
 Appliers.CollectCount = function(value)
     local n = tonumber(value)
     if n and n >= 1 then
         Settings.CollectCount = math.floor(n)
     end
-end
-Appliers.UseCollectCount = function(value)
-    Settings.UseCollectCount = value
-    if not value then collected = 0 end
 end
 Appliers.FarmEnabled = function(value)
     Settings.FarmEnabled = value
@@ -361,21 +451,22 @@ Appliers.FarmEnabled = function(value)
     end
 end
 
+Elements.FarmRoom = Features:Dropdown({
+    Title = "Select Room",
+    Values = ROOM_LIST,
+    Value = Settings.FarmRoom,
+    Callback = function(value) Appliers.FarmRoom(value) end,
+})
+Elements.CollectCount = Features:Input({
+    Title = "Collect Rocks Before Teleport Back",
+    Placeholder = "Example: 4",
+    Value = tostring(Settings.CollectCount),
+    Callback = function(text) Appliers.CollectCount(text) end,
+})
 Elements.FarmEnabled = Features:Toggle({
     Title = "Auto Farm",
     Default = false,
     Callback = function(value) Appliers.FarmEnabled(value) end,
-})
-Elements.CollectCount = Features:Input({
-    Title = "Collect Rocks Before Teleport Back",
-    Placeholder = "Example: 5",
-    Value = tostring(Settings.CollectCount),
-    Callback = function(text) Appliers.CollectCount(text) end,
-})
-Elements.UseCollectCount = Features:Toggle({
-    Title = "Enable Collect Count",
-    Default = true,
-    Callback = function(value) Appliers.UseCollectCount(value) end,
 })
 
 -- ================= AUTO UPGRADE SECTION =================
@@ -590,4 +681,293 @@ Elements.FlySpeed = Players_Tab:Slider({
 Elements.FlyEnabled = Players_Tab:Toggle({
     Title = "Enable Fly",
     Default = false,
-    Callback = function(value) Appliers
+    Callback = function(value) Appliers.FlyEnabled(value) end,
+})
+Players_Tab:Paragraph({
+    Title = "Fly Controls",
+    Desc = "Move with WASD / joystick (you fly where the camera looks).\nSpace = up, Left Ctrl = down.",
+    Image = "info",
+})
+Player.CharacterAdded:Connect(function()
+    task.wait(1)
+    if Settings.FlyEnabled then startFly() end
+end)
+Players_Tab:Section({Title = "SERVER"})
+local function rejoinServer()
+    notify("Rejoin", "Rejoining server...")
+    if #Players:GetPlayers() <= 1 then
+        Player:Kick("\nRejoining...")
+        task.wait()
+        TeleportService:Teleport(game.PlaceId, Player)
+    else
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Player)
+    end
+end
+local function hopServer()
+    notify("Server Hop", "Searching for a new server...")
+    local ok, result = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
+    end)
+    if not ok or not result or not result.data then
+        notify("Server Hop", "Could not fetch the server list.")
+        return false
+    end
+    local candidates = {}
+    for _, server in ipairs(result.data) do
+        if server.id ~= game.JobId and server.playing and server.maxPlayers and server.playing < server.maxPlayers then
+            table.insert(candidates, server.id)
+        end
+    end
+    if #candidates == 0 then
+        notify("Server Hop", "No other servers found.")
+        return false
+    end
+    TeleportService:TeleportToPlaceInstance(game.PlaceId, candidates[math.random(1, #candidates)], Player)
+    return true
+end
+Players_Tab:Button({Title = "Rejoin Server", Callback = rejoinServer})
+Players_Tab:Button({Title = "Server Hop", Callback = hopServer})
+Appliers.HopInterval = function(value) Settings.HopInterval = value end
+local hopToken = 0
+Appliers.AutoHop = function(value)
+    Settings.AutoHop = value
+    hopToken = hopToken + 1
+    if value then
+        local myToken = hopToken
+        task.spawn(function()
+            while Settings.AutoHop and hopToken == myToken do
+                local remaining = Settings.HopInterval
+                while remaining > 0 and Settings.AutoHop and hopToken == myToken do
+                    task.wait(1)
+                    remaining = remaining - 1
+                end
+                if Settings.AutoHop and hopToken == myToken then
+                    hopServer()
+                    task.wait(10)
+                end
+            end
+        end)
+    end
+end
+Elements.HopInterval = Players_Tab:Slider({
+    Title = "Auto Hop Interval (seconds)",
+    Step = 5,
+    Value = {Min = 30, Max = 600, Default = Settings.HopInterval},
+    Callback = function(value) Appliers.HopInterval(value) end,
+})
+Elements.AutoHop = Players_Tab:Toggle({
+    Title = "Auto Server Hop",
+    Default = false,
+    Callback = function(value) Appliers.AutoHop(value) end,
+})
+Appliers.AutoRejoin = function(value) Settings.AutoRejoin = value end
+Elements.AutoRejoin = Players_Tab:Toggle({
+    Title = "Auto Rejoin (on disconnect)",
+    Default = false,
+    Callback = function(value) Appliers.AutoRejoin(value) end,
+})
+pcall(function()
+    local overlay = game:GetService("CoreGui"):WaitForChild("RobloxPromptGui"):WaitForChild("promptOverlay")
+    overlay.ChildAdded:Connect(function(child)
+        if Settings.AutoRejoin and child.Name == "ErrorPrompt" then
+            task.wait(2)
+            rejoinServer()
+        end
+    end)
+end)
+
+-- ================= CONFIG TAB (per-game) =================
+local ConfigTab = Window:Tab({Title = "Config", Icon = "settings"})
+Window:Divider()
+local ROOT_FOLDER = "SoulWarden"
+local GAME_ID = tostring(game.PlaceId)
+local FOLDER = ROOT_FOLDER .. "/" .. GAME_ID
+local AUTOLOAD_FILE = FOLDER .. "/autoload.json"
+local canFile = typeof(writefile) == "function" and typeof(readfile) == "function" and typeof(isfile) == "function"
+if canFile and typeof(isfolder) == "function" and typeof(makefolder) == "function" then
+    if not isfolder(ROOT_FOLDER) then pcall(makefolder, ROOT_FOLDER) end
+    if not isfolder(FOLDER) then pcall(makefolder, FOLDER) end
+end
+local ConfigNames = {}
+local SelectedConfig = nil
+local TypedName = ""
+local AutoLoadEnabled = false
+local function cleanName(name)
+    name = tostring(name or "")
+    name = name:gsub("[^%w_%-% ]", "")
+    name = name:match("^%s*(.-)%s*$")
+    return name
+end
+local function configPath(name) return FOLDER .. "/" .. name .. ".json" end
+if canFile and typeof(listfiles) == "function" then
+    pcall(function()
+        for _, path in ipairs(listfiles(FOLDER)) do
+            local name = path:match("([^/\\]+)%.json$")
+            if name and name ~= "autoload" and not table.find(ConfigNames, name) then
+                table.insert(ConfigNames, name)
+            end
+        end
+    end)
+end
+table.sort(ConfigNames)
+local ConfigDropdown
+local function refreshDropdown()
+    table.sort(ConfigNames)
+    pcall(function() ConfigDropdown:Refresh(ConfigNames) end)
+end
+local function saveAutoLoad()
+    if not canFile then return end
+    pcall(function()
+        writefile(AUTOLOAD_FILE, HttpService:JSONEncode({enabled = AutoLoadEnabled, name = SelectedConfig}))
+    end)
+end
+local function saveConfig(name)
+    if not canFile then
+        notify("Config", "Your executor does not support file saving.")
+        return false
+    end
+    return pcall(function()
+        writefile(configPath(name), HttpService:JSONEncode(Settings))
+    end)
+end
+local function loadConfig(name)
+    if not canFile or not isfile(configPath(name)) then
+        notify("Config", "Config not found: " .. tostring(name))
+        return false
+    end
+    local ok, data = pcall(function()
+        return HttpService:JSONDecode(readfile(configPath(name)))
+    end)
+    if not ok or type(data) ~= "table" then
+        notify("Config", "Failed to read config.")
+        return false
+    end
+    local order = {
+        "WalkSpeed", "FlySpeed", "HopInterval", "CollectCount", "FarmRoom",
+        "AutoBuyEyesight", "AutoBuyPocket", "AutoBuyPickaxe",
+        "WalkSpeedEnabled", "FlyEnabled", "AutoHop", "AutoRejoin", "FarmEnabled",
+    }
+    for _, key in ipairs(order) do
+        local value = data[key]
+        if value ~= nil and Appliers[key] then
+            Appliers[key](value)
+            local set = pcall(function() Elements[key]:Set(value) end)
+            if not set then
+                pcall(function() Elements[key]:Select(value) end)
+            end
+        end
+    end
+    return true
+end
+ConfigTab:Section({Title = "CREATE CONFIG"})
+ConfigTab:Input({
+    Title = "Config Name",
+    Placeholder = "Type a name (example: X)",
+    Value = "",
+    Callback = function(text) TypedName = text end,
+})
+ConfigTab:Button({
+    Title = "Submit",
+    Callback = function()
+        local name = cleanName(TypedName)
+        if name == "" then
+            notify("Config", "Type a config name first.")
+            return
+        end
+        if not table.find(ConfigNames, name) then
+            table.insert(ConfigNames, name)
+        end
+        SelectedConfig = name
+        saveConfig(name)
+        refreshDropdown()
+        pcall(function() ConfigDropdown:Select(name) end)
+        notify("Config", "Created config: " .. name)
+    end,
+})
+ConfigTab:Section({Title = "MANAGE CONFIGS"})
+ConfigDropdown = ConfigTab:Dropdown({
+    Title = "Select Config",
+    Values = ConfigNames,
+    Value = ConfigNames[1],
+    Callback = function(value)
+        SelectedConfig = value
+        if AutoLoadEnabled then saveAutoLoad() end
+    end,
+})
+ConfigTab:Button({
+    Title = "Save Config",
+    Callback = function()
+        if not SelectedConfig then
+            notify("Config", "Select or create a config first.")
+            return
+        end
+        if saveConfig(SelectedConfig) then
+            notify("Config", "Saved: " .. SelectedConfig)
+        end
+    end,
+})
+ConfigTab:Button({
+    Title = "Load Config",
+    Callback = function()
+        if not SelectedConfig then
+            notify("Config", "Select a config first.")
+            return
+        end
+        if loadConfig(SelectedConfig) then
+            notify("Config", "Loaded: " .. SelectedConfig)
+        end
+    end,
+})
+ConfigTab:Button({
+    Title = "Delete Config",
+    Callback = function()
+        if not SelectedConfig then
+            notify("Config", "Select a config first.")
+            return
+        end
+        local name = SelectedConfig
+        pcall(function()
+            if typeof(delfile) == "function" and isfile(configPath(name)) then
+                delfile(configPath(name))
+            end
+        end)
+        local index = table.find(ConfigNames, name)
+        if index then table.remove(ConfigNames, index) end
+        SelectedConfig = nil
+        refreshDropdown()
+        notify("Config", "Deleted: " .. name)
+    end,
+})
+ConfigTab:Section({Title = "AUTO LOAD"})
+ConfigTab:Toggle({
+    Title = "Auto Load Config",
+    Default = false,
+    Callback = function(value)
+        AutoLoadEnabled = value
+        saveAutoLoad()
+    end,
+})
+ConfigTab:Paragraph({
+    Title = "Auto Load",
+    Desc = "When enabled, the selected config loads automatically the next time you run the script in THIS game.",
+    Image = "info",
+})
+task.spawn(function()
+    task.wait(1)
+    if not canFile or not isfile(AUTOLOAD_FILE) then return end
+    local ok, data = pcall(function()
+        return HttpService:JSONDecode(readfile(AUTOLOAD_FILE))
+    end)
+    if ok and type(data) == "table" and data.enabled and data.name then
+        SelectedConfig = data.name
+        AutoLoadEnabled = true
+        if not table.find(ConfigNames, data.name) then
+            table.insert(ConfigNames, data.name)
+            refreshDropdown()
+        end
+        pcall(function() ConfigDropdown:Select(data.name) end)
+        if loadConfig(data.name) then
+            notify("Auto Load", "Loaded config: " .. data.name)
+        end
+    end
+end)
