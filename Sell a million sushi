@@ -1,0 +1,549 @@
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+local Stats = game:GetService("Stats")
+local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+local VERIFIED = "\u{E000}"
+local Window = WindUI:CreateWindow({
+    Title = "SELL A MILLION SUSHI",
+    Author = "by Nexyro " .. VERIFIED,
+    Icon = "radio",
+    Theme = "Dark",
+    Size = UDim2.fromOffset(550, 430),
+    HideSearchBar = false,
+    User = {Enabled = true, Anonymous = false},
+    ToggleKey = Enum.KeyCode.RightControl,
+})
+local function addTag(title, color, icon)
+    local tag
+    local ok = pcall(function()
+        tag = Window:Tag({Title = title, Icon = icon, Color = Color3.fromHex(color), Radius = 13})
+    end)
+    if not ok or not tag then
+        pcall(function()
+            tag = Window:Tag({Title = title, Color = Color3.fromHex(color)})
+        end)
+    end
+    return tag
+end
+local PingTag = addTag("-- MS", "#3b82f6", "badge-check")
+addTag("v1.1", "#30ff6a", "github")
+addTag("BETA", "#f59e0b", "flask-conical")
+local function notify(title, content)
+    pcall(function()
+        WindUI:Notify({Title = title, Content = content, Duration = 4})
+    end)
+end
+notify("SELL A MILLION SUSHI v1.0", "Loaded successfully (Beta) - by Nexyro " .. VERIFIED)
+local function getPing()
+    local ok, value = pcall(function()
+        return Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
+    end)
+    if ok and value then return math.floor(value) end
+    return nil
+end
+local Home = Window:Tab({Title = "Home", Icon = "house"})
+Window:Divider()
+Home:Section({Title = "PROFILE"})
+Home:Paragraph({Title = "Welcome, " .. Player.DisplayName, Desc = "Your Roblox profile information.", Image = "user-round"})
+Home:Paragraph({
+    Title = "Player Information",
+    Desc = "Username: @" .. Player.Name
+        .. "\nDisplay Name: " .. Player.DisplayName
+        .. "\nUser ID: " .. Player.UserId
+        .. "\nAccount Age: " .. Player.AccountAge .. " days",
+    Image = "circle-user",
+})
+Home:Section({Title = "GAME INFORMATION"})
+local success, gameInfo = pcall(function()
+    return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId)
+end)
+Home:Paragraph({
+    Title = "Current Game",
+    Desc = "Game Name: " .. (success and gameInfo.Name or "Unknown")
+        .. "\nGame ID: " .. game.PlaceId
+        .. "\nPlace ID: " .. game.PlaceId,
+    Image = "gamepad-2",
+})
+Home:Section({Title = "SESSION"})
+local startTime = os.clock()
+local SessionParagraph = Home:Paragraph({Title = "Time Playing", Desc = "00:00:00", Image = "clock"})
+local PingParagraph = Home:Paragraph({Title = "Ping", Desc = "-- MS", Image = "wifi"})
+task.spawn(function()
+    while task.wait(1) do
+        local elapsed = math.floor(os.clock() - startTime)
+        SessionParagraph:SetDesc(string.format("%02d:%02d:%02d", math.floor(elapsed / 3600), math.floor((elapsed % 3600) / 60), elapsed % 60))
+        local ping = getPing()
+        if ping then
+            pcall(function() PingParagraph:SetDesc(ping .. " MS") end)
+            pcall(function() PingTag:SetTitle(ping .. " MS") end)
+            local color = "#30ff6a"
+            if ping >= 150 then
+                color = "#ef4444"
+            elseif ping >= 80 then
+                color = "#f59e0b"
+            end
+            pcall(function() PingTag:SetColor(Color3.fromHex(color)) end)
+        end
+    end
+end)
+Home:Section({Title = "INFO"})
+Home:Paragraph({Title = "Info - Beta", Desc = "Version: 1.0\nStatus: BETA\nSome features may change or be updated.", Image = "info"})
+Home:Section({Title = "CREDITS"})
+Home:Paragraph({Title = "Credit By Nexyro " .. VERIFIED, Desc = "Designed and developed by Nexyro " .. VERIFIED, Image = "radio"})
+local Features = Window:Tab({Title = "Main Features", Icon = "zap"})
+Window:Divider()
+Features:Section({Title = "FISHING"})
+local AutoCollectFish = false
+Features:Toggle({
+    Title = "Auto Collect Fish",
+    Default = false,
+    Callback = function(Value)
+        AutoCollectFish = Value
+        if Value then
+            task.spawn(function()
+                local Event = game:GetService("ReplicatedStorage").RemoteEvents.LootPickup
+                local ids = {}
+                for i = 1, 50 do
+                    table.insert(ids, i)
+                end
+                while AutoCollectFish do
+                    pcall(function()
+                        Event:FireServer(ids, false)
+                    end)
+                    task.wait(0.1)
+                end
+            end)
+        end
+    end,
+})
+Features:Section({Title = "AUTOMATION"})
+local CashText = Player.PlayerGui:WaitForChild("CurrencyGui"):WaitForChild("Frame"):WaitForChild("CashText")
+local function parseMoney(text)
+    if not text then return nil end
+    text = tostring(text):upper()
+    text = text:gsub(",", "")
+    text = text:gsub("%$", "")
+    local number, suffix = text:match("([%d%.]+)%s*([KMB]?)")
+    if not number then return nil end
+    number = tonumber(number)
+    if not number then return nil end
+    local multiplier = {K = 1000, M = 1000000, B = 1000000000}
+    return number * (multiplier[suffix] or 1)
+end
+local function getCash()
+    return parseMoney(CashText.Text)
+end
+local Plots = workspace:WaitForChild("Plots")
+local function getButton(plot, category, name)
+    local folder = plot:FindFirstChild(category)
+    if not folder then return nil end
+    local object = folder:FindFirstChild(name)
+    if not object then return nil end
+    return object:FindFirstChild("Button") or object
+end
+local function triggerButton(button)
+    if not button then return end
+    local character = Player.Character or Player.CharacterAdded:Wait()
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    if typeof(firetouchinterest) ~= "function" then return end
+    firetouchinterest(root, button, 0)
+    task.wait(0.1)
+    firetouchinterest(root, button, 1)
+end
+local function createAutoToggle(title, buttonName, category)
+    local enabled = false
+    Features:Toggle({
+        Title = title,
+        Default = false,
+        Callback = function(value)
+            enabled = value
+            if enabled then
+                task.spawn(function()
+                    while enabled do
+                        for i = 1, 6 do
+                            if not enabled then break end
+                            local plot = Plots:FindFirstChild("Plot_" .. i)
+                            if plot then
+                                local button = getButton(plot, category, buttonName)
+                                if button then triggerButton(button) end
+                            end
+                            task.wait(0.1)
+                        end
+                        task.wait(0.1)
+                    end
+                end)
+            end
+        end,
+    })
+end
+createAutoToggle("Auto Collect Cash", "CollectButton", "Sell")
+createAutoToggle("Auto Deposit", "DepositButton", "Sell")
+local AutoUpgradeChef = false
+Features:Toggle({
+    Title = "Auto Upgrade Chef Skill",
+    Default = false,
+    Callback = function(Value)
+        AutoUpgradeChef = Value
+        if Value then
+            task.spawn(function()
+                while AutoUpgradeChef do
+                    for i = 1, 6 do
+                        if not AutoUpgradeChef then break end
+                        local plot = Plots:FindFirstChild("Plot_" .. i)
+                        if plot then
+                            local sell = plot:FindFirstChild("Sell")
+                            if sell then
+                                local upgrade = sell:FindFirstChild("UpgradeButton")
+                                if upgrade then
+                                    local button = upgrade:FindFirstChild("Button")
+                                    if button then triggerButton(button) end
+                                end
+                            end
+                        end
+                        task.wait(0.1)
+                    end
+                    task.wait(0.1)
+                end
+            end)
+        end
+    end,
+})
+createAutoToggle("Auto Merge", "ButtonMerge", "Buttons")
+local AutoHire = false
+Features:Toggle({
+    Title = "Auto Hire",
+    Default = false,
+    Callback = function(Value)
+        AutoHire = Value
+        if Value then
+            task.spawn(function()
+                local Event = game:GetService("ReplicatedStorage").RemoteEvents.UnlockChest
+                while AutoHire do
+                    pcall(function()
+                        Event:FireServer()
+                    end)
+                    task.wait(0.5)
+                end
+            end)
+        end
+    end,
+})
+Features:Section({Title = "BUYING"})
+local selectedAmount = "1"
+Features:Dropdown({
+    Title = "Buy Amount",
+    Values = {"1", "5", "25", "100"},
+    Value = "1",
+    Callback = function(value)
+        selectedAmount = tostring(value)
+    end,
+})
+local function getButtonPrice(button)
+    if not button then return nil end
+    for _, obj in ipairs(button:GetDescendants()) do
+        if obj:IsA("TextLabel") or obj:IsA("TextButton") then
+            local text = obj.Text
+            if text and text ~= "" then
+                local value = parseMoney(text)
+                if value then return value end
+            end
+        end
+    end
+    return nil
+end
+local AutoBuy = false
+Features:Toggle({
+    Title = "Auto Buy",
+    Default = false,
+    Callback = function(value)
+        AutoBuy = value
+        if AutoBuy then
+            task.spawn(function()
+                while AutoBuy do
+                    for i = 1, 6 do
+                        if not AutoBuy then break end
+                        local plot = Plots:FindFirstChild("Plot_" .. i)
+                        if plot then
+                            local buttons = plot:FindFirstChild("Buttons")
+                            if buttons then
+                                local object = buttons:FindFirstChild("ButtonBuy" .. selectedAmount)
+                                if object then
+                                    local button = object:FindFirstChild("Button") or object
+                                    local cash = getCash()
+                                    local price = getButtonPrice(object)
+                                    if cash and price and cash >= price then triggerButton(button) end
+                                end
+                            end
+                        end
+                        task.wait(0.1)
+                    end
+                    task.wait(0.1)
+                end
+            end)
+        end
+    end,
+})
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local Settings = {
+    WalkSpeedEnabled = false,
+    WalkSpeed = 16,
+    FlyEnabled = false,
+    FlySpeed = 50,
+    AutoHop = false,
+    HopInterval = 120,
+    AutoRejoin = false,
+}
+local Elements = {}
+local Appliers = {}
+local function getHumanoid()
+    local character = Player.Character
+    return character and character:FindFirstChildOfClass("Humanoid")
+end
+local function getRoot()
+    local character = Player.Character
+    return character and character:FindFirstChild("HumanoidRootPart")
+end
+local Players_Tab = Window:Tab({Title = "Player", Icon = "user"})
+Window:Divider()
+Players_Tab:Section({Title = "WALK SPEED"})
+Appliers.WalkSpeed = function(value)
+    Settings.WalkSpeed = value
+end
+Appliers.WalkSpeedEnabled = function(value)
+    Settings.WalkSpeedEnabled = value
+    if not value then
+        local hum = getHumanoid()
+        if hum then hum.WalkSpeed = 16 end
+    end
+end
+Elements.WalkSpeed = Players_Tab:Slider({
+    Title = "Speed",
+    Step = 1,
+    Value = {Min = 1, Max = 250, Default = Settings.WalkSpeed},
+    Callback = function(value) Appliers.WalkSpeed(value) end,
+})
+Elements.WalkSpeedEnabled = Players_Tab:Toggle({
+    Title = "Enable Speed",
+    Default = false,
+    Callback = function(value) Appliers.WalkSpeedEnabled(value) end,
+})
+RunService.Heartbeat:Connect(function()
+    if Settings.WalkSpeedEnabled then
+        local hum = getHumanoid()
+        if hum and hum.WalkSpeed ~= Settings.WalkSpeed then
+            hum.WalkSpeed = Settings.WalkSpeed
+        end
+    end
+end)
+Players_Tab:Section({Title = "FLY"})
+local flyConnection, flyVelocity, flyGyro
+local function stopFly()
+    if flyConnection then flyConnection:Disconnect() flyConnection = nil end
+    if flyVelocity then flyVelocity:Destroy() flyVelocity = nil end
+    if flyGyro then flyGyro:Destroy() flyGyro = nil end
+    local hum = getHumanoid()
+    if hum then hum.PlatformStand = false end
+end
+local function startFly()
+    stopFly()
+    flyConnection = RunService.RenderStepped:Connect(function()
+        local root = getRoot()
+        local hum = getHumanoid()
+        local camera = workspace.CurrentCamera
+        if not root or not hum or not camera then return end
+        if not flyVelocity or flyVelocity.Parent ~= root then
+            if flyVelocity then flyVelocity:Destroy() end
+            flyVelocity = Instance.new("BodyVelocity")
+            flyVelocity.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+            flyVelocity.Velocity = Vector3.zero
+            flyVelocity.Parent = root
+        end
+        if not flyGyro or flyGyro.Parent ~= root then
+            if flyGyro then flyGyro:Destroy() end
+            flyGyro = Instance.new("BodyGyro")
+            flyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+            flyGyro.P = 9e4
+            flyGyro.Parent = root
+        end
+        hum.PlatformStand = true
+        flyGyro.CFrame = camera.CFrame
+        local direction = Vector3.zero
+        local move = hum.MoveDirection
+        if move.Magnitude > 0 then
+            local relative = camera.CFrame:VectorToObjectSpace(move)
+            direction = direction + camera.CFrame.RightVector * relative.X + camera.CFrame.LookVector * (-relative.Z)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            direction = direction + Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+            direction = direction - Vector3.new(0, 1, 0)
+        end
+        if direction.Magnitude > 0 then
+            flyVelocity.Velocity = direction.Unit * Settings.FlySpeed
+        else
+            flyVelocity.Velocity = Vector3.zero
+        end
+    end)
+end
+Appliers.FlySpeed = function(value)
+    Settings.FlySpeed = value
+end
+Appliers.FlyEnabled = function(value)
+    Settings.FlyEnabled = value
+    if value then startFly() else stopFly() end
+end
+Elements.FlySpeed = Players_Tab:Slider({
+    Title = "Fly Speed",
+    Step = 1,
+    Value = {Min = 1, Max = 250, Default = Settings.FlySpeed},
+    Callback = function(value) Appliers.FlySpeed(value) end,
+})
+Elements.FlyEnabled = Players_Tab:Toggle({
+    Title = "Enable Fly",
+    Default = false,
+    Callback = function(value) Appliers.FlyEnabled(value) end,
+})
+Players_Tab:Paragraph({
+    Title = "Fly Controls",
+    Desc = "Move with WASD / joystick (you fly where the camera looks).\nSpace = up, Left Ctrl = down.",
+    Image = "info",
+})
+Player.CharacterAdded:Connect(function()
+    task.wait(1)
+    if Settings.FlyEnabled then startFly() end
+end)
+Players_Tab:Section({Title = "SERVER"})
+local function rejoinServer()
+    notify("Rejoin", "Rejoining server...")
+    if #Players:GetPlayers() <= 1 then
+        Player:Kick("\nRejoining...")
+        task.wait()
+        TeleportService:Teleport(game.PlaceId, Player)
+    else
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Player)
+    end
+end
+local function hopServer()
+    notify("Server Hop", "Searching for a new server...")
+    local ok, result = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
+    end)
+    if not ok or not result or not result.data then
+        notify("Server Hop", "Could not fetch the server list.")
+        return false
+    end
+    local candidates = {}
+    for _, server in ipairs(result.data) do
+        if server.id ~= game.JobId and server.playing and server.maxPlayers and server.playing < server.maxPlayers then
+            table.insert(candidates, server.id)
+        end
+    end
+    if #candidates == 0 then
+        notify("Server Hop", "No other servers found.")
+        return false
+    end
+    TeleportService:TeleportToPlaceInstance(game.PlaceId, candidates[math.random(1, #candidates)], Player)
+    return true
+end
+Players_Tab:Button({Title = "Rejoin Server", Callback = rejoinServer})
+Players_Tab:Button({Title = "Server Hop", Callback = hopServer})
+Appliers.HopInterval = function(value)
+    Settings.HopInterval = value
+end
+local hopToken = 0
+Appliers.AutoHop = function(value)
+    Settings.AutoHop = value
+    hopToken = hopToken + 1
+    if value then
+        local myToken = hopToken
+        task.spawn(function()
+            while Settings.AutoHop and hopToken == myToken do
+                local remaining = Settings.HopInterval
+                while remaining > 0 and Settings.AutoHop and hopToken == myToken do
+                    task.wait(1)
+                    remaining = remaining - 1
+                end
+                if Settings.AutoHop and hopToken == myToken then
+                    hopServer()
+                    task.wait(10)
+                end
+            end
+        end)
+    end
+end
+Elements.HopInterval = Players_Tab:Slider({
+    Title = "Auto Hop Interval (seconds)",
+    Step = 5,
+    Value = {Min = 30, Max = 600, Default = Settings.HopInterval},
+    Callback = function(value) Appliers.HopInterval(value) end,
+})
+Elements.AutoHop = Players_Tab:Toggle({
+    Title = "Auto Server Hop",
+    Default = false,
+    Callback = function(value) Appliers.AutoHop(value) end,
+})
+Appliers.AutoRejoin = function(value)
+    Settings.AutoRejoin = value
+end
+Elements.AutoRejoin = Players_Tab:Toggle({
+    Title = "Auto Rejoin (on disconnect)",
+    Default = false,
+    Callback = function(value) Appliers.AutoRejoin(value) end,
+})
+pcall(function()
+    local overlay = game:GetService("CoreGui"):WaitForChild("RobloxPromptGui"):WaitForChild("promptOverlay")
+    overlay.ChildAdded:Connect(function(child)
+        if Settings.AutoRejoin and child.Name == "ErrorPrompt" then
+            task.wait(2)
+            rejoinServer()
+        end
+    end)
+end)
+local ConfigTab = Window:Tab({Title = "Config", Icon = "settings"})
+Window:Divider()
+local FOLDER = "SoulWarden"
+local AUTOLOAD_FILE = FOLDER .. "/autoload.json"
+local canFile = typeof(writefile) == "function" and typeof(readfile) == "function" and typeof(isfile) == "function"
+if canFile and typeof(isfolder) == "function" and typeof(makefolder) == "function" and not isfolder(FOLDER) then
+    pcall(makefolder, FOLDER)
+end
+local ConfigNames = {}
+local SelectedConfig = nil
+local TypedName = ""
+local AutoLoadEnabled = false
+local function cleanName(name)
+    name = tostring(name or "")
+    name = name:gsub("[^%w_%-% ]", "")
+    name = name:match("^%s*(.-)%s*$")
+    return name
+end
+local function configPath(name)
+    return FOLDER .. "/" .. name .. ".json"
+end
+if canFile and typeof(listfiles) == "function" then
+    pcall(function()
+        for _, path in ipairs(listfiles(FOLDER)) do
+            local name = path:match("([^/\\]+)%.json$")
+            if name and name ~= "autoload" and not table.find(ConfigNames, name) then
+                table.insert(ConfigNames, name)
+            end
+        end
+    end)
+end
+table.sort(ConfigNames)
+local ConfigDropdown
+local function refreshDropdown()
+    table.sort(ConfigNames)
+    pcall(function() ConfigDropdown:Refresh(ConfigNames) end)
+end
+local function saveAutoLoad()
+    if not canFile then return end
+    pcall(function()
+        writefile(AUTOLOAD_FILE, HttpService:JSONEncode({enabled = AutoLoadEnabled, name = SelectedConfig}))
+    end)
+en
