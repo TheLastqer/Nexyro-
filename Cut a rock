@@ -1,149 +1,58 @@
+local Airflow = loadstring(game:HttpGet("https://raw.githubusercontent.com/PookiePepelsss/Airflow-UI/refs/heads/main/Source.luau"))()
 
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 local Stats = game:GetService("Stats")
-local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
-local VERIFIED = "\u{E000}"
-local VERSION = "v1.1"
-local Window = WindUI:CreateWindow({
-    Title = "Cut A Rock",
-    Author = "by Nexyro " .. VERIFIED,
-    Icon = "radio",
-    Theme = "Dark",
-    Size = UDim2.fromOffset(550, 430),
-    HideSearchBar = false,
-    User = {Enabled = true, Anonymous = false},
-    ToggleKey = Enum.KeyCode.RightControl,
-})
-local function addTag(title, color, icon)
-    local tag
-    local ok = pcall(function()
-        tag = Window:Tag({Title = title, Icon = icon, Color = Color3.fromHex(color), Radius = 13})
-    end)
-    if not ok or not tag then
-        pcall(function()
-            tag = Window:Tag({Title = title, Color = Color3.fromHex(color)})
-        end)
-    end
-    return tag
-end
-local PingTag = addTag("-- MS", "#3b82f6", "badge-check")
-addTag(VERSION, "#30ff6a", "github")
-local function notify(title, content)
-    pcall(function()
-        WindUI:Notify({Title = title, Content = content, Duration = 4})
-    end)
-end
-notify("Cut A Rock " .. VERSION, "Loaded successfully - by Nexyro " .. VERIFIED)
-local function getPing()
-    local ok, value = pcall(function()
-        return Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
-    end)
-    if ok and value then return math.floor(value) end
-    return nil
-end
-
--- ================= HOME TAB =================
-local Home = Window:Tab({Title = "Home", Icon = "house"})
-Window:Divider()
-Home:Section({Title = "PROFILE"})
-Home:Paragraph({Title = "Welcome, " .. Player.DisplayName, Desc = "Your Roblox profile information.", Image = "user-round"})
-Home:Paragraph({
-    Title = "Player Information",
-    Desc = "Username: @" .. Player.Name
-        .. "\nDisplay Name: " .. Player.DisplayName
-        .. "\nUser ID: " .. Player.UserId
-        .. "\nAccount Age: " .. Player.AccountAge .. " days",
-    Image = "circle-user",
-})
-Home:Section({Title = "GAME INFORMATION"})
-local success, gameInfo = pcall(function()
-    return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId)
-end)
-Home:Paragraph({
-    Title = "Current Game",
-    Desc = "Game Name: " .. (success and gameInfo.Name or "Unknown")
-        .. "\nGame ID: " .. game.PlaceId
-        .. "\nPlace ID: " .. game.PlaceId,
-    Image = "gamepad-2",
-})
-Home:Section({Title = "SESSION"})
-local startTime = os.clock()
-local SessionParagraph = Home:Paragraph({Title = "Time Playing", Desc = "00:00:00", Image = "clock"})
-local PingParagraph = Home:Paragraph({Title = "Ping", Desc = "-- MS", Image = "wifi"})
-task.spawn(function()
-    local tick = 0
-    while task.wait(1) do
-        tick = tick + 1
-        local elapsed = math.floor(os.clock() - startTime)
-        SessionParagraph:SetDesc(string.format("%02d:%02d:%02d", math.floor(elapsed / 3600), math.floor((elapsed % 3600) / 60), elapsed % 60))
-        if tick % 3 == 0 then
-            local ping = getPing()
-            if ping then
-                pcall(function() PingParagraph:SetDesc(ping .. " MS") end)
-                pcall(function() PingTag:SetTitle(ping .. " MS") end)
-                local color = "#30ff6a"
-                if ping >= 150 then
-                    color = "#ef4444"
-                elseif ping >= 80 then
-                    color = "#f59e0b"
-                end
-                pcall(function() PingTag:SetColor(Color3.fromHex(color)) end)
-            end
-        end
-    end
-end)
-Home:Section({Title = "INFO"})
-Home:Paragraph({Title = "Cut A Rock " .. VERSION, Desc = "Version: 1.1\nStatus: Stable Release", Image = "info"})
-Home:Section({Title = "CREDITS"})
-Home:Paragraph({Title = "Credit By Nexyro " .. VERIFIED, Desc = "Designed and developed by Nexyro " .. VERIFIED, Image = "radio"})
-
--- ================= UPDATES TAB =================
-local UpdatesTab = Window:Tab({Title = "Updates", Icon = "megaphone"})
-Window:Divider()
-UpdatesTab:Section({Title = "LATEST UPDATE"})
-UpdatesTab:Paragraph({
-    Title = "V1.1",
-    Desc = "[+] Added 20 room selections to Auto Farm\n"
-        .. "[+] Added teleport to spawn after your collect amount\n"
-        .. "[+] Added Updates window\n"
-        .. "[-] Removed Beta status and tag\n"
-        .. "[*] Improved Auto Farm stability",
-    Image = "sparkles",
-})
-UpdatesTab:Section({Title = "PREVIOUS UPDATES"})
-UpdatesTab:Paragraph({
-    Title = "V1.0 RELEASE",
-    Desc = "[+] Initial release\n"
-        .. "[+] Auto Farm, Auto Upgrade, Player tools and Config system",
-    Image = "rocket",
-})
-
-local Features = Window:Tab({Title = "Main Features", Icon = "zap"})
-Window:Divider()
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CoreGui = game:GetService("CoreGui")
+
+local VERIFIED = "\u{E000}"
+local VERSION = "v1.2"
+local TITLE = "Cut A Rock"
+local DISCORD_INVITE = "https://discord.gg/4rQnT9ehUe"
+local DISCORD_CODE = "4rQnT9ehUe"
+
+local Window = Airflow:CreateWindow({
+    Name = TITLE,
+    LoadingSubtitle = "by Nexyro " .. VERIFIED,
+    Icon = "radio",
+    ToggleUIKeybind = "RightControl",
+    Size = UDim2.fromOffset(640, 420),
+    Search = true,
+    OpenButton = { Title = TITLE, Icon = "radio" },
+    Loading = {
+        Enabled = true,
+        Title = TITLE .. " " .. VERSION,
+        Text = "Starting",
+        Steps = { "Preparing interface", "Loading features", "Almost there" },
+        Duration = 1.6,
+    },
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "NexyroCutARock",
+        FileName = "default",
+    },
+})
+
+local function notify(title, content, kind)
+    pcall(function()
+        Window:Notify({Title = title, Content = content, Type = kind or "Info", Duration = 4})
+    end)
+end
 
 local Settings = {
-    WalkSpeedEnabled = false,
-    WalkSpeed = 16,
-    FlyEnabled = false,
-    FlySpeed = 50,
-    AutoHop = false,
-    HopInterval = 120,
-    AutoRejoin = false,
-    FarmEnabled = false,
-    FarmRoom = "Supreme",
-    CollectCount = 1,
-    AutoBuyEyesight = false,
-    AutoBuyPocket = false,
-    AutoBuyPickaxe = false,
+    WalkSpeedEnabled = false, WalkSpeed = 16,
+    FlyEnabled = false, FlySpeed = 50,
+    AutoHop = false, HopInterval = 120, AutoRejoin = false,
+    FarmEnabled = false, FarmRoom = "Common", CollectCount = 1,
+    AutoBuyEyesight = false, AutoBuyPocket = false, AutoBuyPickaxe = false,
+    AutoSell = false,
 }
-local Elements = {}
-local Appliers = {}
+
 local function getHumanoid()
     local character = Player.Character
     return character and character:FindFirstChildOfClass("Humanoid")
@@ -153,30 +62,248 @@ local function getRoot()
     return character and character:FindFirstChild("HumanoidRootPart")
 end
 
--- ================= MAIN FEATURES TAB: AUTO FARM =================
-Features:Section({Title = "AUTO FARM"})
+local function addDivider(tab)
+    if not tab then return end
+    local ok = pcall(function() tab:CreateDivider() end)
+    if ok then return end
+    pcall(function()
+        tab:CreateParagraph({
+            Title = "─────────────────────────────────────────",
+            Content = "",
+        })
+    end)
+end
+
+local function findAirflowScreenGui()
+    local containers = {CoreGui}
+    local pg = Player:FindFirstChild("PlayerGui")
+    if pg then table.insert(containers, pg) end
+    for _, container in ipairs(containers) do
+        for _, gui in ipairs(container:GetChildren()) do
+            if gui:IsA("ScreenGui") then
+                for _, d in ipairs(gui:GetDescendants()) do
+                    if d:IsA("TextLabel") and d.Text == TITLE then
+                        return gui, d
+                    end
+                end
+            end
+        end
+    end
+    return nil, nil
+end
+
+-- ================= INFORMATION TAB =================
+local Home = Window:CreateTab({Name = "Information", Icon = "house"})
+
+Home:CreateSection("PROFILE")
+Home:CreateParagraph({
+    Title = "Welcome, " .. Player.DisplayName,
+    Content = "Username: @" .. Player.Name
+        .. "\nDisplay Name: " .. Player.DisplayName
+        .. "\nUser ID: " .. Player.UserId
+        .. "\nAccount Age: " .. Player.AccountAge .. " days",
+})
+addDivider(Home)
+
+Home:CreateSection("GAME INFORMATION")
+local success, gameInfo = pcall(function()
+    return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId)
+end)
+Home:CreateParagraph({
+    Title = "Current Game",
+    Content = "Game Name: " .. (success and gameInfo.Name or "Unknown")
+        .. "\nGame ID: " .. game.PlaceId
+        .. "\nPlace ID: " .. game.PlaceId,
+})
+addDivider(Home)
+
+Home:CreateSection("SESSION")
+local startTime = os.clock()
+Home:CreateLabel({
+    Text = "Time Playing: 00:00:00",
+    UpdateRate = 1,
+    Update = function()
+        local elapsed = math.floor(os.clock() - startTime)
+        return string.format("Time Playing: %02d:%02d:%02d", math.floor(elapsed / 3600), math.floor((elapsed % 3600) / 60), elapsed % 60)
+    end,
+})
+Home:CreateLabel({
+    Text = "Ping: -- MS",
+    UpdateRate = 2,
+    Update = function()
+        local ok, value = pcall(function()
+            return Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
+        end)
+        if ok and value then
+            return "Ping: " .. math.floor(value) .. " MS"
+        end
+        return "Ping: -- MS"
+    end,
+})
+addDivider(Home)
+
+Home:CreateSection("COMMUNITY")
+Home:CreateButton({
+    Name = "Join Our Discord Server",
+    Icon = "message-circle",
+    Callback = function()
+        pcall(function() setclipboard(DISCORD_INVITE) end)
+        notify("Discord", "Invite link copied: " .. DISCORD_INVITE, "Success")
+    end,
+})
+addDivider(Home)
+
+Home:CreateSection("CREDITS")
+Home:CreateParagraph({
+    Title = "Credit By Nexyro " .. VERIFIED,
+    Content = "Version: 1.2",
+})
+
+-- ================= UPDATES TAB =================
+local UpdatesTab = Window:CreateTab({Name = "Updates", Icon = "megaphone"})
+
+UpdatesTab:CreateSection("LATEST UPDATE")
+UpdatesTab:CreateParagraph({
+    Title = "Version 1.2",
+    Content = "New features:\n"
+        .. "  - Auto Sell function using SellEvent\n"
+        .. "  - Discord tab with invite link and server statistics\n"
+        .. "  - Quick Join Discord button on Information tab\n"
+        .. "  - Background color selector next to exit button\n"
+        .. "  - Section dividers for readability\n\n"
+        .. "Improvements:\n"
+        .. "  - Auto Farm re-scans rooms for rock positions\n"
+        .. "  - More reliable teleport after rebirth\n"
+        .. "  - Improved character load detection\n"
+        .. "  - Fallback teleport when no rock is found\n"
+        .. "  - Various stability fixes",
+})
+
+UpdatesTab:CreateSection("PREVIOUS UPDATES")
+UpdatesTab:CreateParagraph({
+    Title = "Version 1.1",
+    Content = "  - Added 20 room selections to Auto Farm\n"
+        .. "  - Added teleport to spawn after collect amount\n"
+        .. "  - Added Updates window\n"
+        .. "  - Added search bar\n"
+        .. "  - New Airflow UI\n"
+        .. "  - Improved Auto Farm stability",
+})
+UpdatesTab:CreateParagraph({
+    Title = "Version 1.0",
+    Content = "  - Initial release\n"
+        .. "  - Auto Farm, Auto Upgrade, Player tools, Config system",
+})
+
+-- ================= DISCORD TAB =================
+local DiscordTab = Window:CreateTab({Name = "Discord", Icon = "message-circle"})
+
+DiscordTab:CreateSection("OUR COMMUNITY")
+DiscordTab:CreateParagraph({
+    Title = "Nexyro's Discord Server",
+    Content = "Join the official community for:\n"
+        .. "  - Script updates and early access\n"
+        .. "  - Support and troubleshooting\n"
+        .. "  - Giveaways and events\n"
+        .. "  - Chat with other users\n\n"
+        .. "Invite Link:\n" .. DISCORD_INVITE,
+})
+DiscordTab:CreateButton({
+    Name = "Copy Invite Link",
+    Icon = "copy",
+    Callback = function()
+        local ok = pcall(function() setclipboard(DISCORD_INVITE) end)
+        if ok then
+            notify("Discord", "Invite link copied to clipboard.", "Success")
+        else
+            notify("Discord", "Could not copy. Link: " .. DISCORD_INVITE, "Warning")
+        end
+    end,
+})
+DiscordTab:CreateButton({
+    Name = "Open Invite in Browser",
+    Icon = "external-link",
+    Callback = function()
+        pcall(function() setclipboard(DISCORD_INVITE) end)
+        notify("Discord", "Link copied. Paste it in your browser.", "Info")
+    end,
+})
+
+DiscordTab:CreateSection("SERVER STATS")
+
+local discordStats = {Total = "...", Online = "...", Offline = "...", Available = false, LastRefresh = 0}
+
+DiscordTab:CreateLabel({
+    Text = "👥 Total Members: ...",
+    UpdateRate = 2,
+    Update = function() return "👥 Total Members: " .. tostring(discordStats.Total) end,
+})
+DiscordTab:CreateLabel({
+    Text = "🟢 Active (Online): ...",
+    UpdateRate = 2,
+    Update = function() return "🟢 Active (Online): " .. tostring(discordStats.Online) end,
+})
+DiscordTab:CreateLabel({
+    Text = "⚫ Inactive (Offline): ...",
+    UpdateRate = 2,
+    Update = function() return "⚫ Inactive (Offline): " .. tostring(discordStats.Offline) end,
+})
+DiscordTab:CreateLabel({
+    Text = "🔄 Last Refresh: --",
+    UpdateRate = 2,
+    Update = function()
+        if discordStats.LastRefresh == 0 then return "🔄 Last Refresh: --" end
+        local ago = math.floor(os.clock() - discordStats.LastRefresh)
+        return "🔄 Last Refresh: " .. ago .. "s ago"
+    end,
+})
+
+local function fetchDiscordStats()
+    local ok, response = pcall(function()
+        return game:HttpGet("https://discord.com/api/v9/invites/" .. DISCORD_CODE .. "?with_counts=true&with_expiration=true")
+    end)
+    if not ok or not response or type(response) ~= "string" or #response < 4 then
+        discordStats.Total = "Unavailable"
+        discordStats.Online = "Unavailable"
+        discordStats.Offline = "Unavailable"
+        return
+    end
+    local decoded
+    local decodeOk = pcall(function() decoded = HttpService:JSONDecode(response) end)
+    if not decodeOk or not decoded or not decoded.approximate_member_count then
+        discordStats.Total = "Unavailable"
+        discordStats.Online = "Unavailable"
+        discordStats.Offline = "Unavailable"
+        return
+    end
+    local total = tonumber(decoded.approximate_member_count) or 0
+    local online = tonumber(decoded.approximate_presence_count) or 0
+    discordStats.Total = tostring(total)
+    discordStats.Online = tostring(online)
+    discordStats.Offline = tostring(math.max(0, total - online))
+    discordStats.Available = true
+    discordStats.LastRefresh = os.clock()
+end
+
+task.spawn(function()
+    fetchDiscordStats()
+    while true do
+        task.wait(60)
+        fetchDiscordStats()
+    end
+end)
+
+-- ================= MAIN FEATURES TAB =================
+local Features = Window:CreateTab({Name = "Main Features", Icon = "zap"})
+
+Features:CreateSection("AUTO FARM")
 
 local ROOMS = {
-    Common = "Room_0",
-    Uncommon = "Room_3",
-    Rare = "Room_5",
-    Elite = "Room_7",
-    Epic = "Room_9",
-    Legendary = "Room_10",
-    Mythic = "Room_11",
-    Divine = "Room_15",
-    Ancient = "Room_17",
-    Immortal = "Room_19",
-    Eternal = "Room_21",
-    Secret = "Room_23",
-    Hidden = "Room_26",
-    Forbidden = "Room_25",
-    Unknown = "Room_29",
-    Ascended = "Room_32",
-    Cosmic = "Room_32",
-    Ethereal = "Room_34",
-    Primal = "Room_37",
-    Supreme = "Room_39",
+    Common = "Room_0", Uncommon = "Room_3", Rare = "Room_5", Elite = "Room_7",
+    Epic = "Room_9", Legendary = "Room_10", Mythic = "Room_11", Divine = "Room_15",
+    Ancient = "Room_17", Immortal = "Room_19", Eternal = "Room_21", Secret = "Room_23",
+    Hidden = "Room_26", Forbidden = "Room_25", Unknown = "Room_29", Ascended = "Room_32",
+    Cosmic = "Room_32", Ethereal = "Room_34", Primal = "Room_37", Supreme = "Room_39",
 }
 local ROOM_LIST = {
     "Common", "Uncommon", "Rare", "Elite", "Epic", "Legendary", "Mythic",
@@ -194,9 +321,7 @@ local collected = 0
 local lastMinePos = nil
 local lastDebug = 0
 
-local function getTargetRoom()
-    return ROOMS[Settings.FarmRoom] or ROOMS.Supreme
-end
+local function getTargetRoom() return ROOMS[Settings.FarmRoom] or ROOMS.Common end
 
 local function getPromptPos(prompt)
     local parent = prompt.Parent
@@ -230,14 +355,12 @@ local function promptAlive(prompt)
     return prompt and prompt.Parent and prompt:IsDescendantOf(workspace) and prompt.Enabled
 end
 
--- finds the closest enabled prompt inside the selected room only
 local function findRoomPrompt()
     local rooms = workspace:FindFirstChild("Rooms")
     if not rooms then return nil end
     local room = rooms:FindFirstChild(getTargetRoom())
     if not room then return nil end
     local container = room:FindFirstChild("Rocks") or room
-
     local root = getRoot()
     local best, bestDist = nil, math.huge
     for _, inst in ipairs(container:GetDescendants()) do
@@ -245,9 +368,7 @@ local function findRoomPrompt()
             local pos = getPromptPos(inst)
             if pos then
                 local dist = root and (root.Position - pos).Magnitude or 0
-                if dist < bestDist then
-                    best, bestDist = inst, dist
-                end
+                if dist < bestDist then best, bestDist = inst, dist end
             end
         end
     end
@@ -261,9 +382,7 @@ local function triggerPrompt(prompt)
         pcall(fireproximityprompt, prompt)
     else
         pcall(function()
-            prompt:InputHoldBegin()
-            task.wait(0.05)
-            prompt:InputHoldEnd()
+            prompt:InputHoldBegin(); task.wait(0.05); prompt:InputHoldEnd()
         end)
     end
 end
@@ -318,9 +437,7 @@ local function teleportTo(target)
     if not character then return false end
     local root = character:FindFirstChild("HumanoidRootPart")
     if not root then return false end
-    pcall(function()
-        character:PivotTo(CFrame.new(target))
-    end)
+    pcall(function() character:PivotTo(CFrame.new(target)) end)
     return true
 end
 
@@ -330,57 +447,47 @@ local function startFarm()
     collected = 0
     lastMinePos = nil
     task.spawn(function()
-        local function active()
-            return Settings.FarmEnabled and farmToken == myToken
-        end
+        local function active() return Settings.FarmEnabled and farmToken == myToken end
 
         local function returnToRock()
             local waitChar = 0
             while active() and not getRoot() and waitChar < 10 do
-                task.wait(0.25)
-                waitChar = waitChar + 0.25
+                task.wait(0.25); waitChar = waitChar + 0.25
             end
-            task.wait(0.5)
-            if active() and lastMinePos then
-                teleportTo(lastMinePos)
+            if not active() then return end
+            task.wait(0.6)
+            for _ = 1, 3 do
+                if not active() then return end
+                local prompt = findRoomPrompt()
+                if prompt then
+                    local pos = getPromptPos(prompt)
+                    if pos then
+                        local dest = pos + Vector3.new(0, HEIGHT_OFFSET, 0)
+                        teleportTo(dest); lastMinePos = dest; return
+                    end
+                end
+                task.wait(0.5)
             end
+            if active() and lastMinePos then teleportTo(lastMinePos) end
         end
 
         while active() do
             local target = math.max(1, math.floor(tonumber(Settings.CollectCount) or 1))
-
             if isCepFull() then
-                -- bag full: send back to spawn
                 local tries = 0
                 while active() and isCepFull() and tries < 20 do
-                    fireRemote(true)
-                    tries = tries + 1
-                    task.wait(0.5)
+                    fireRemote(true); tries = tries + 1; task.wait(0.5)
                 end
-                collected = 0
-                returnToRock()
-
+                collected = 0; returnToRock()
             elseif collected >= target then
-                -- reached the typed amount: teleport to spawn, then return to the rocks
                 local spawnPos = getSpawnPos()
-                if spawnPos then
-                    teleportTo(spawnPos)
-                else
-                    notify("Auto Farm", "SpawnLocation not found in workspace.SpawnAlani.")
-                end
-                task.wait(0.5)
-                fireRemote(false)
-                collected = 0
-                task.wait(0.5)
+                if spawnPos and getRoot() then teleportTo(spawnPos) end
+                task.wait(0.6); fireRemote(false); collected = 0; task.wait(0.6)
                 returnToRock()
-
             else
                 local root = getRoot()
-                if not root then
-                    task.wait(0.5)
-                else
+                if not root then task.wait(0.5) else
                     local prompt = findRoomPrompt()
-
                     if not prompt then
                         local rooms = workspace:FindFirstChild("Rooms")
                         local room = rooms and rooms:FindFirstChild(getTargetRoom())
@@ -390,33 +497,21 @@ local function startFarm()
                                 teleportTo(rpos + Vector3.new(0, HEIGHT_OFFSET, 0))
                             end
                         end
-                        if os.clock() - lastDebug > 15 then
-                            lastDebug = os.clock()
-                            notify("Auto Farm", "Waiting for rocks in " .. tostring(Settings.FarmRoom) .. " (" .. getTargetRoom() .. ")...")
-                        end
                         task.wait(1)
                     else
                         local promptPos = getPromptPos(prompt)
                         if promptPos then
                             local dest = promptPos + Vector3.new(0, HEIGHT_OFFSET, 0)
-                            lastMinePos = dest
-                            teleportTo(dest)
-                            task.wait(0.2)
-
-                            local waited = 0
-                            local triggered = false
+                            lastMinePos = dest; teleportTo(dest); task.wait(0.2)
+                            local waited = 0; local triggered = false
                             while active() and promptAlive(prompt) and not isCepFull() and waited < MAX_STAY do
-                                triggerPrompt(prompt)
-                                triggered = true
-                                task.wait(FIRE_DELAY)
-                                waited = waited + FIRE_DELAY
+                                triggerPrompt(prompt); triggered = true
+                                task.wait(FIRE_DELAY); waited = waited + FIRE_DELAY
                             end
                             if triggered and not promptAlive(prompt) then
                                 collected = collected + 1
                             end
-                        else
-                            task.wait(0.5)
-                        end
+                        else task.wait(0.5) end
                     end
                 end
             end
@@ -425,198 +520,164 @@ local function startFarm()
     end)
 end
 
-Appliers.FarmRoom = function(value)
-    if type(value) == "table" then value = value[1] end
-    if not ROOMS[value] then return end
-    Settings.FarmRoom = value
-    -- switching room mid-farm: reset and restart so it teleports to the new room
-    collected = 0
-    lastMinePos = nil
-    if Settings.FarmEnabled then
-        startFarm()
-    end
-end
-Appliers.CollectCount = function(value)
-    local n = tonumber(value)
-    if n and n >= 1 then
-        Settings.CollectCount = math.floor(n)
-    end
-end
-Appliers.FarmEnabled = function(value)
-    Settings.FarmEnabled = value
-    if value then
-        startFarm()
-    else
-        farmToken = farmToken + 1
-    end
-end
-
-Elements.FarmRoom = Features:Dropdown({
-    Title = "Select Room",
-    Values = ROOM_LIST,
-    Value = Settings.FarmRoom,
-    Callback = function(value) Appliers.FarmRoom(value) end,
+Features:CreateDropdown({
+    Name = "Select Room", Options = ROOM_LIST,
+    CurrentOption = Settings.FarmRoom, SearchAfter = 6, Flag = "FarmRoom",
+    Callback = function(Option)
+        if type(Option) == "table" then Option = Option[1] end
+        if not Option or not ROOMS[Option] then return end
+        Settings.FarmRoom = Option
+        collected = 0; lastMinePos = nil
+        if Settings.FarmEnabled then startFarm() end
+    end,
 })
-Elements.CollectCount = Features:Input({
-    Title = "Collect Rocks Before Teleport Back",
-    Placeholder = "Example: 4",
-    Value = tostring(Settings.CollectCount),
-    Callback = function(text) Appliers.CollectCount(text) end,
+Features:CreateInput({
+    Name = "Collect Rocks Before Teleport Back", Icon = "pickaxe",
+    PlaceholderText = "Example: 1", CurrentValue = tostring(Settings.CollectCount),
+    Numeric = true, Flag = "CollectCount",
+    Callback = function(Text)
+        local n = tonumber(Text)
+        if n and n >= 1 then Settings.CollectCount = math.floor(n) end
+    end,
 })
-Elements.FarmEnabled = Features:Toggle({
-    Title = "Auto Farm",
-    Default = false,
-    Callback = function(value) Appliers.FarmEnabled(value) end,
+Features:CreateToggle({
+    Name = "Auto Farm", CurrentValue = false, Flag = "FarmEnabled",
+    Callback = function(Value)
+        Settings.FarmEnabled = Value
+        if Value then startFarm() else farmToken = farmToken + 1 end
+    end,
 })
 
--- ================= AUTO UPGRADE SECTION =================
-Features:Section({Title = "AUTO UPGRADE"})
+addDivider(Features)
 
-local upgradeEvent = nil
-local function getUpgradeEvent()
-    if upgradeEvent and upgradeEvent.Parent then
-        return upgradeEvent
-    end
-    local ok, ev = pcall(function()
-        return ReplicatedStorage:FindFirstChild("UpgradeEvent")
-    end)
-    if ok and ev then
-        upgradeEvent = ev
-        return ev
-    end
+Features:CreateSection("AUTO SELL")
+
+local function fireSellAll()
+    local ev = ReplicatedStorage:FindFirstChild("SellEvent")
+    if ev then pcall(function() ev:FireServer("SellAll") end); return true end
+    return false
+end
+
+local sellToken = 0
+Features:CreateToggle({
+    Name = "Auto Sell", CurrentValue = false, Flag = "AutoSell",
+    Callback = function(Value)
+        Settings.AutoSell = Value
+        sellToken = sellToken + 1
+        if Value then
+            local myToken = sellToken
+            task.spawn(function()
+                while Settings.AutoSell and sellToken == myToken do
+                    fireSellAll(); task.wait(1)
+                end
+            end)
+        end
+    end,
+})
+
+addDivider(Features)
+
+Features:CreateSection("AUTO UPGRADE")
+
+local function getRemote(name)
+    local ok, ev = pcall(function() return ReplicatedStorage:FindFirstChild(name) end)
+    if ok then return ev end
     return nil
 end
 
 local function fireUpgrade(name)
-    local ev = getUpgradeEvent()
+    local ev = getRemote("UpgradeEvent")
     if not ev then return false end
-    return pcall(function()
-        ev:FireServer(name, 1)
-    end)
+    return pcall(function() ev:FireServer(name, 1) end)
 end
 
 local eyesightToken = 0
-Appliers.AutoBuyEyesight = function(value)
-    Settings.AutoBuyEyesight = value
-    eyesightToken = eyesightToken + 1
-    if value then
-        local myToken = eyesightToken
-        task.spawn(function()
-            while Settings.AutoBuyEyesight and eyesightToken == myToken do
-                fireUpgrade("Eyesight")
-                task.wait(1)
-            end
-        end)
-    end
-end
+Features:CreateToggle({
+    Name = "Auto Buy Eyesight", CurrentValue = false, Flag = "AutoBuyEyesight",
+    Callback = function(Value)
+        Settings.AutoBuyEyesight = Value
+        eyesightToken = eyesightToken + 1
+        if Value then
+            local myToken = eyesightToken
+            task.spawn(function()
+                while Settings.AutoBuyEyesight and eyesightToken == myToken do
+                    fireUpgrade("Eyesight"); task.wait(1)
+                end
+            end)
+        end
+    end,
+})
 
 local pocketToken = 0
-Appliers.AutoBuyPocket = function(value)
-    Settings.AutoBuyPocket = value
-    pocketToken = pocketToken + 1
-    if value then
-        local myToken = pocketToken
-        task.spawn(function()
-            while Settings.AutoBuyPocket and pocketToken == myToken do
-                fireUpgrade("Pocket")
-                task.wait(1)
-            end
-        end)
-    end
-end
-
--- >>> AUTO BUY PICKAXE (2 -> 33)
-local pickaxeEvent = nil
-local function getPickaxeEvent()
-    if pickaxeEvent and pickaxeEvent.Parent then
-        return pickaxeEvent
-    end
-    local ok, ev = pcall(function()
-        return ReplicatedStorage:FindFirstChild("PickaxeBuyEvent")
-    end)
-    if ok and ev then
-        pickaxeEvent = ev
-        return ev
-    end
-    return nil
-end
-
-local PICKAXE_MIN = 2
-local PICKAXE_MAX = 33
-local PICKAXE_DELAY = 0.1
-
-local pickaxeToken = 0
-Appliers.AutoBuyPickaxe = function(value)
-    Settings.AutoBuyPickaxe = value
-    pickaxeToken = pickaxeToken + 1
-    if value then
-        local myToken = pickaxeToken
-        task.spawn(function()
-            while Settings.AutoBuyPickaxe and pickaxeToken == myToken do
-                local ev = getPickaxeEvent()
-                if ev then
-                    for i = PICKAXE_MIN, PICKAXE_MAX do
-                        if not (Settings.AutoBuyPickaxe and pickaxeToken == myToken) then break end
-                        pcall(function() ev:FireServer(i) end)
-                        task.wait(PICKAXE_DELAY)
-                    end
+Features:CreateToggle({
+    Name = "Auto Buy Pocket", CurrentValue = false, Flag = "AutoBuyPocket",
+    Callback = function(Value)
+        Settings.AutoBuyPocket = Value
+        pocketToken = pocketToken + 1
+        if Value then
+            local myToken = pocketToken
+            task.spawn(function()
+                while Settings.AutoBuyPocket and pocketToken == myToken do
+                    fireUpgrade("Pocket"); task.wait(1)
                 end
-                task.wait(1)
-            end
-        end)
-    end
-end
+            end)
+        end
+    end,
+})
 
-Elements.AutoBuyEyesight = Features:Toggle({
-    Title = "Auto Buy Eyesight",
-    Default = false,
-    Callback = function(value) Appliers.AutoBuyEyesight(value) end,
-})
-Elements.AutoBuyPocket = Features:Toggle({
-    Title = "Auto Buy Pocket",
-    Default = false,
-    Callback = function(value) Appliers.AutoBuyPocket(value) end,
-})
-Elements.AutoBuyPickaxe = Features:Toggle({
-    Title = "Auto Buy Pickaxe",
-    Default = false,
-    Callback = function(value) Appliers.AutoBuyPickaxe(value) end,
+local PICKAXE_MIN, PICKAXE_MAX, PICKAXE_DELAY = 2, 33, 0.1
+local pickaxeToken = 0
+Features:CreateToggle({
+    Name = "Auto Buy Pickaxe", CurrentValue = false, Flag = "AutoBuyPickaxe",
+    Callback = function(Value)
+        Settings.AutoBuyPickaxe = Value
+        pickaxeToken = pickaxeToken + 1
+        if Value then
+            local myToken = pickaxeToken
+            task.spawn(function()
+                while Settings.AutoBuyPickaxe and pickaxeToken == myToken do
+                    local ev = getRemote("PickaxeBuyEvent")
+                    if ev then
+                        for i = PICKAXE_MIN, PICKAXE_MAX do
+                            if not (Settings.AutoBuyPickaxe and pickaxeToken == myToken) then break end
+                            pcall(function() ev:FireServer(i) end)
+                            task.wait(PICKAXE_DELAY)
+                        end
+                    end
+                    task.wait(1)
+                end
+            end)
+        end
+    end,
 })
 
 -- ================= PLAYER TAB =================
-local Players_Tab = Window:Tab({Title = "Player", Icon = "user"})
-Window:Divider()
-Players_Tab:Section({Title = "WALK SPEED"})
-Appliers.WalkSpeed = function(value)
-    Settings.WalkSpeed = value
-end
-Appliers.WalkSpeedEnabled = function(value)
-    Settings.WalkSpeedEnabled = value
-    if not value then
-        local hum = getHumanoid()
-        if hum then hum.WalkSpeed = 16 end
-    end
-end
-Elements.WalkSpeed = Players_Tab:Slider({
-    Title = "Speed",
-    Step = 1,
-    Value = {Min = 1, Max = 250, Default = Settings.WalkSpeed},
-    Callback = function(value) Appliers.WalkSpeed(value) end,
+local PlayerTab = Window:CreateTab({Name = "Player", Icon = "user"})
+
+PlayerTab:CreateSection("WALK SPEED")
+PlayerTab:CreateSlider({
+    Name = "Speed", Range = {1, 250}, Increment = 1,
+    CurrentValue = Settings.WalkSpeed, Flag = "WalkSpeed",
+    Callback = function(Value) Settings.WalkSpeed = Value end,
 })
-Elements.WalkSpeedEnabled = Players_Tab:Toggle({
-    Title = "Enable Speed",
-    Default = false,
-    Callback = function(value) Appliers.WalkSpeedEnabled(value) end,
+PlayerTab:CreateToggle({
+    Name = "Enable Speed", CurrentValue = false, Flag = "WalkSpeedEnabled",
+    Callback = function(Value)
+        Settings.WalkSpeedEnabled = Value
+        if not Value then
+            local hum = getHumanoid()
+            if hum then hum.WalkSpeed = 16 end
+        end
+    end,
 })
 RunService.Heartbeat:Connect(function()
     if Settings.WalkSpeedEnabled then
         local hum = getHumanoid()
-        if hum and hum.WalkSpeed ~= Settings.WalkSpeed then
-            hum.WalkSpeed = Settings.WalkSpeed
-        end
+        if hum and hum.WalkSpeed ~= Settings.WalkSpeed then hum.WalkSpeed = Settings.WalkSpeed end
     end
 end)
-Players_Tab:Section({Title = "FLY"})
+
+PlayerTab:CreateSection("FLY")
 local flyConnection, flyVelocity, flyGyro
 local function stopFly()
     if flyConnection then flyConnection:Disconnect() flyConnection = nil end
@@ -628,9 +689,7 @@ end
 local function startFly()
     stopFly()
     flyConnection = RunService.RenderStepped:Connect(function()
-        local root = getRoot()
-        local hum = getHumanoid()
-        local camera = workspace.CurrentCamera
+        local root = getRoot(); local hum = getHumanoid(); local camera = workspace.CurrentCamera
         if not root or not hum or not camera then return end
         if not flyVelocity or flyVelocity.Parent ~= root then
             if flyVelocity then flyVelocity:Destroy() end
@@ -654,12 +713,8 @@ local function startFly()
             local relative = camera.CFrame:VectorToObjectSpace(move)
             direction = direction + camera.CFrame.RightVector * relative.X + camera.CFrame.LookVector * (-relative.Z)
         end
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-            direction = direction + Vector3.new(0, 1, 0)
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
-            direction = direction - Vector3.new(0, 1, 0)
-        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then direction = direction + Vector3.new(0, 1, 0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then direction = direction - Vector3.new(0, 1, 0) end
         if direction.Magnitude > 0 then
             flyVelocity.Velocity = direction.Unit * Settings.FlySpeed
         else
@@ -667,32 +722,24 @@ local function startFly()
         end
     end)
 end
-Appliers.FlySpeed = function(value) Settings.FlySpeed = value end
-Appliers.FlyEnabled = function(value)
-    Settings.FlyEnabled = value
-    if value then startFly() else stopFly() end
-end
-Elements.FlySpeed = Players_Tab:Slider({
-    Title = "Fly Speed",
-    Step = 1,
-    Value = {Min = 1, Max = 250, Default = Settings.FlySpeed},
-    Callback = function(value) Appliers.FlySpeed(value) end,
+PlayerTab:CreateSlider({
+    Name = "Fly Speed", Range = {1, 250}, Increment = 1,
+    CurrentValue = Settings.FlySpeed, Flag = "FlySpeed",
+    Callback = function(Value) Settings.FlySpeed = Value end,
 })
-Elements.FlyEnabled = Players_Tab:Toggle({
-    Title = "Enable Fly",
-    Default = false,
-    Callback = function(value) Appliers.FlyEnabled(value) end,
-})
-Players_Tab:Paragraph({
-    Title = "Fly Controls",
-    Desc = "Move with WASD / joystick (you fly where the camera looks).\nSpace = up, Left Ctrl = down.",
-    Image = "info",
+PlayerTab:CreateToggle({
+    Name = "Enable Fly", CurrentValue = false, Flag = "FlyEnabled",
+    Callback = function(Value)
+        Settings.FlyEnabled = Value
+        if Value then startFly() else stopFly() end
+    end,
 })
 Player.CharacterAdded:Connect(function()
     task.wait(1)
     if Settings.FlyEnabled then startFly() end
 end)
-Players_Tab:Section({Title = "SERVER"})
+
+PlayerTab:CreateSection("SERVER")
 local function rejoinServer()
     notify("Rejoin", "Rejoining server...")
     if #Players:GetPlayers() <= 1 then
@@ -709,8 +756,7 @@ local function hopServer()
         return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
     end)
     if not ok or not result or not result.data then
-        notify("Server Hop", "Could not fetch the server list.")
-        return false
+        notify("Server Hop", "Could not fetch the server list.", "Error"); return false
     end
     local candidates = {}
     for _, server in ipairs(result.data) do
@@ -719,255 +765,273 @@ local function hopServer()
         end
     end
     if #candidates == 0 then
-        notify("Server Hop", "No other servers found.")
-        return false
+        notify("Server Hop", "No other servers found.", "Warning"); return false
     end
     TeleportService:TeleportToPlaceInstance(game.PlaceId, candidates[math.random(1, #candidates)], Player)
     return true
 end
-Players_Tab:Button({Title = "Rejoin Server", Callback = rejoinServer})
-Players_Tab:Button({Title = "Server Hop", Callback = hopServer})
-Appliers.HopInterval = function(value) Settings.HopInterval = value end
+PlayerTab:CreateButton({Name = "Rejoin Server", Icon = "refresh-cw", Callback = rejoinServer})
+PlayerTab:CreateButton({Name = "Server Hop", Icon = "shuffle", Callback = hopServer})
+
 local hopToken = 0
-Appliers.AutoHop = function(value)
-    Settings.AutoHop = value
-    hopToken = hopToken + 1
-    if value then
-        local myToken = hopToken
-        task.spawn(function()
-            while Settings.AutoHop and hopToken == myToken do
-                local remaining = Settings.HopInterval
-                while remaining > 0 and Settings.AutoHop and hopToken == myToken do
-                    task.wait(1)
-                    remaining = remaining - 1
-                end
-                if Settings.AutoHop and hopToken == myToken then
-                    hopServer()
-                    task.wait(10)
-                end
-            end
-        end)
-    end
-end
-Elements.HopInterval = Players_Tab:Slider({
-    Title = "Auto Hop Interval (seconds)",
-    Step = 5,
-    Value = {Min = 30, Max = 600, Default = Settings.HopInterval},
-    Callback = function(value) Appliers.HopInterval(value) end,
+PlayerTab:CreateSlider({
+    Name = "Auto Hop Interval", Range = {30, 600}, Increment = 5, Suffix = " s",
+    CurrentValue = Settings.HopInterval, Flag = "HopInterval",
+    Callback = function(Value) Settings.HopInterval = Value end,
 })
-Elements.AutoHop = Players_Tab:Toggle({
-    Title = "Auto Server Hop",
-    Default = false,
-    Callback = function(value) Appliers.AutoHop(value) end,
+PlayerTab:CreateToggle({
+    Name = "Auto Server Hop", CurrentValue = false, Flag = "AutoHop",
+    Callback = function(Value)
+        Settings.AutoHop = Value
+        hopToken = hopToken + 1
+        if Value then
+            local myToken = hopToken
+            task.spawn(function()
+                while Settings.AutoHop and hopToken == myToken do
+                    local remaining = Settings.HopInterval
+                    while remaining > 0 and Settings.AutoHop and hopToken == myToken do
+                        task.wait(1); remaining = remaining - 1
+                    end
+                    if Settings.AutoHop and hopToken == myToken then hopServer(); task.wait(10) end
+                end
+            end)
+        end
+    end,
 })
-Appliers.AutoRejoin = function(value) Settings.AutoRejoin = value end
-Elements.AutoRejoin = Players_Tab:Toggle({
-    Title = "Auto Rejoin (on disconnect)",
-    Default = false,
-    Callback = function(value) Appliers.AutoRejoin(value) end,
+PlayerTab:CreateToggle({
+    Name = "Auto Rejoin (on disconnect)", CurrentValue = false, Flag = "AutoRejoin",
+    Callback = function(Value) Settings.AutoRejoin = Value end,
 })
 pcall(function()
-    local overlay = game:GetService("CoreGui"):WaitForChild("RobloxPromptGui"):WaitForChild("promptOverlay")
+    local overlay = CoreGui:WaitForChild("RobloxPromptGui"):WaitForChild("promptOverlay")
     overlay.ChildAdded:Connect(function(child)
         if Settings.AutoRejoin and child.Name == "ErrorPrompt" then
-            task.wait(2)
-            rejoinServer()
+            task.wait(2); rejoinServer()
         end
     end)
 end)
 
--- ================= CONFIG TAB (per-game) =================
-local ConfigTab = Window:Tab({Title = "Config", Icon = "settings"})
-Window:Divider()
-local ROOT_FOLDER = "SoulWarden"
-local GAME_ID = tostring(game.PlaceId)
-local FOLDER = ROOT_FOLDER .. "/" .. GAME_ID
-local AUTOLOAD_FILE = FOLDER .. "/autoload.json"
-local canFile = typeof(writefile) == "function" and typeof(readfile) == "function" and typeof(isfile) == "function"
-if canFile and typeof(isfolder) == "function" and typeof(makefolder) == "function" then
-    if not isfolder(ROOT_FOLDER) then pcall(makefolder, ROOT_FOLDER) end
-    if not isfolder(FOLDER) then pcall(makefolder, FOLDER) end
-end
-local ConfigNames = {}
-local SelectedConfig = nil
-local TypedName = ""
-local AutoLoadEnabled = false
-local function cleanName(name)
-    name = tostring(name or "")
-    name = name:gsub("[^%w_%-% ]", "")
-    name = name:match("^%s*(.-)%s*$")
-    return name
-end
-local function configPath(name) return FOLDER .. "/" .. name .. ".json" end
-if canFile and typeof(listfiles) == "function" then
-    pcall(function()
-        for _, path in ipairs(listfiles(FOLDER)) do
-            local name = path:match("([^/\\]+)%.json$")
-            if name and name ~= "autoload" and not table.find(ConfigNames, name) then
-                table.insert(ConfigNames, name)
-            end
-        end
-    end)
-end
-table.sort(ConfigNames)
-local ConfigDropdown
-local function refreshDropdown()
-    table.sort(ConfigNames)
-    pcall(function() ConfigDropdown:Refresh(ConfigNames) end)
-end
-local function saveAutoLoad()
-    if not canFile then return end
-    pcall(function()
-        writefile(AUTOLOAD_FILE, HttpService:JSONEncode({enabled = AutoLoadEnabled, name = SelectedConfig}))
-    end)
-end
-local function saveConfig(name)
-    if not canFile then
-        notify("Config", "Your executor does not support file saving.")
-        return false
-    end
-    return pcall(function()
-        writefile(configPath(name), HttpService:JSONEncode(Settings))
-    end)
-end
-local function loadConfig(name)
-    if not canFile or not isfile(configPath(name)) then
-        notify("Config", "Config not found: " .. tostring(name))
-        return false
-    end
-    local ok, data = pcall(function()
-        return HttpService:JSONDecode(readfile(configPath(name)))
-    end)
-    if not ok or type(data) ~= "table" then
-        notify("Config", "Failed to read config.")
-        return false
-    end
-    local order = {
-        "WalkSpeed", "FlySpeed", "HopInterval", "CollectCount", "FarmRoom",
-        "AutoBuyEyesight", "AutoBuyPocket", "AutoBuyPickaxe",
-        "WalkSpeedEnabled", "FlyEnabled", "AutoHop", "AutoRejoin", "FarmEnabled",
-    }
-    for _, key in ipairs(order) do
-        local value = data[key]
-        if value ~= nil and Appliers[key] then
-            Appliers[key](value)
-            local set = pcall(function() Elements[key]:Set(value) end)
-            if not set then
-                pcall(function() Elements[key]:Select(value) end)
+-- ================= CONFIG TAB =================
+local ConfigTab = Window:CreateTab({Name = "Config", Icon = "settings"})
+ConfigTab:CreateSection("CONFIGS")
+ConfigTab:CreateConfigManager({Name = "Configs"})
+
+pcall(function() Window:LoadConfig() end)
+
+-- =====================================================
+-- TOP BAR: BACKGROUND COLOR BUTTON NEXT TO EXIT
+-- =====================================================
+local COLOR_PRESETS = {
+    {Name = "Dark Navy",     Color = Color3.fromRGB(22, 22, 28)},
+    {Name = "Midnight Blue", Color = Color3.fromRGB(18, 24, 38)},
+    {Name = "Charcoal",      Color = Color3.fromRGB(30, 30, 30)},
+    {Name = "Deep Purple",   Color = Color3.fromRGB(35, 20, 50)},
+    {Name = "Dark Red",      Color = Color3.fromRGB(45, 15, 20)},
+    {Name = "Forest Green",  Color = Color3.fromRGB(20, 40, 25)},
+    {Name = "Ocean Teal",    Color = Color3.fromRGB(15, 35, 45)},
+    {Name = "Pure Black",    Color = Color3.fromRGB(0, 0, 0)},
+    {Name = "Off White",     Color = Color3.fromRGB(240, 240, 245)},
+}
+
+local currentBgColor = Color3.fromRGB(22, 22, 28)
+
+local function findExitButton(gui, titleLabel)
+    local titleY = titleLabel.AbsolutePosition.Y
+    local best, bestRight = nil, -math.huge
+    for _, d in ipairs(gui:GetDescendants()) do
+        if (d:IsA("ImageButton") or d:IsA("TextButton")) and d.Visible then
+            local sz = d.AbsoluteSize
+            if sz.X >= 10 and sz.X <= 55 and math.abs(sz.X - sz.Y) <= 15 then
+                if math.abs(d.AbsolutePosition.Y - titleY) <= 40 then
+                    local rightEdge = d.AbsolutePosition.X + sz.X
+                    if rightEdge > bestRight then best, bestRight = d, rightEdge end
+                end
             end
         end
     end
-    return true
+    return best
 end
-ConfigTab:Section({Title = "CREATE CONFIG"})
-ConfigTab:Input({
-    Title = "Config Name",
-    Placeholder = "Type a name (example: X)",
-    Value = "",
-    Callback = function(text) TypedName = text end,
-})
-ConfigTab:Button({
-    Title = "Submit",
-    Callback = function()
-        local name = cleanName(TypedName)
-        if name == "" then
-            notify("Config", "Type a config name first.")
-            return
+
+local function getWindowFrame(gui, titleLabel)
+    local node = titleLabel
+    while node and node.Parent and node.Parent ~= gui do
+        node = node.Parent
+    end
+    return node
+end
+
+local function applyBackgroundColor(color)
+    local gui, titleLabel = findAirflowScreenGui()
+    if not gui or not titleLabel then return end
+    local winFrame = getWindowFrame(gui, titleLabel)
+    if winFrame and winFrame:IsA("GuiObject") then
+        winFrame.BackgroundColor3 = color
+        local parent = winFrame.Parent
+        if parent and parent:IsA("Frame") and parent.BackgroundTransparency < 1 then
+            parent.BackgroundColor3 = color
         end
-        if not table.find(ConfigNames, name) then
-            table.insert(ConfigNames, name)
-        end
-        SelectedConfig = name
-        saveConfig(name)
-        refreshDropdown()
-        pcall(function() ConfigDropdown:Select(name) end)
-        notify("Config", "Created config: " .. name)
-    end,
-})
-ConfigTab:Section({Title = "MANAGE CONFIGS"})
-ConfigDropdown = ConfigTab:Dropdown({
-    Title = "Select Config",
-    Values = ConfigNames,
-    Value = ConfigNames[1],
-    Callback = function(value)
-        SelectedConfig = value
-        if AutoLoadEnabled then saveAutoLoad() end
-    end,
-})
-ConfigTab:Button({
-    Title = "Save Config",
-    Callback = function()
-        if not SelectedConfig then
-            notify("Config", "Select or create a config first.")
-            return
-        end
-        if saveConfig(SelectedConfig) then
-            notify("Config", "Saved: " .. SelectedConfig)
-        end
-    end,
-})
-ConfigTab:Button({
-    Title = "Load Config",
-    Callback = function()
-        if not SelectedConfig then
-            notify("Config", "Select a config first.")
-            return
-        end
-        if loadConfig(SelectedConfig) then
-            notify("Config", "Loaded: " .. SelectedConfig)
-        end
-    end,
-})
-ConfigTab:Button({
-    Title = "Delete Config",
-    Callback = function()
-        if not SelectedConfig then
-            notify("Config", "Select a config first.")
-            return
-        end
-        local name = SelectedConfig
-        pcall(function()
-            if typeof(delfile) == "function" and isfile(configPath(name)) then
-                delfile(configPath(name))
-            end
+    end
+end
+
+local function createTopPopup(gui, anchorBtn, items, onSelect, title)
+    local existing = gui:FindFirstChild("NexyroPopup")
+    if existing then existing:Destroy() end
+
+    local absPos = anchorBtn.AbsolutePosition
+    local absSize = anchorBtn.AbsoluteSize
+    local popupWidth = 200
+    local popupHeight = math.min(#items * 32 + 46, 320)
+    local screenSize = gui.AbsoluteSize
+    local x = math.max(8, math.min(absPos.X + absSize.X - popupWidth, screenSize.X - popupWidth - 8))
+    local y = math.min(absPos.Y + absSize.Y + 4, screenSize.Y - popupHeight - 8)
+
+    local popup = Instance.new("Frame")
+    popup.Name = "NexyroPopup"
+    popup.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
+    popup.BorderSizePixel = 0
+    popup.Position = UDim2.new(0, x, 0, y)
+    popup.Size = UDim2.new(0, popupWidth, 0, popupHeight)
+    popup.ZIndex = 2000
+    popup.Parent = gui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8); corner.Parent = popup
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(60, 60, 75); stroke.Thickness = 1; stroke.Parent = popup
+
+    local titleLbl = Instance.new("TextLabel")
+    titleLbl.Size = UDim2.new(1, -20, 0, 28)
+    titleLbl.Position = UDim2.new(0, 10, 0, 8)
+    titleLbl.BackgroundTransparency = 1
+    titleLbl.Text = title or "Select"
+    titleLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleLbl.Font = Enum.Font.GothamBold
+    titleLbl.TextSize = 14
+    titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+    titleLbl.ZIndex = 2001
+    titleLbl.Parent = popup
+
+    local scroller = Instance.new("ScrollingFrame")
+    scroller.Size = UDim2.new(1, -20, 1, -48)
+    scroller.Position = UDim2.new(0, 10, 0, 40)
+    scroller.BackgroundTransparency = 1
+    scroller.BorderSizePixel = 0
+    scroller.ScrollBarThickness = 3
+    scroller.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 120)
+    scroller.CanvasSize = UDim2.new(0, 0, 0, #items * 32)
+    scroller.ZIndex = 2001
+    scroller.Parent = popup
+
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 4)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = scroller
+
+    for i, item in ipairs(items) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, 0, 0, 28)
+        btn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.Text = "        " .. (item.Name or "")
+        btn.Font = Enum.Font.Gotham
+        btn.TextSize = 13
+        btn.TextXAlignment = Enum.TextXAlignment.Left
+        btn.BorderSizePixel = 0
+        btn.LayoutOrder = i
+        btn.ZIndex = 2002
+        btn.AutoButtonColor = true
+
+        local btnCorner = Instance.new("UICorner")
+        btnCorner.CornerRadius = UDim.new(0, 5); btnCorner.Parent = btn
+
+        local swatch = Instance.new("Frame")
+        swatch.Size = UDim2.new(0, 16, 0, 16)
+        swatch.Position = UDim2.new(0, 8, 0.5, -8)
+        swatch.BackgroundColor3 = item.Color
+        swatch.BorderSizePixel = 0
+        swatch.ZIndex = 2003
+        local swCorner = Instance.new("UICorner")
+        swCorner.CornerRadius = UDim.new(0, 3); swCorner.Parent = swatch
+        swatch.Parent = btn
+
+        btn.MouseButton1Click:Connect(function()
+            onSelect(item)
+            popup:Destroy()
         end)
-        local index = table.find(ConfigNames, name)
-        if index then table.remove(ConfigNames, index) end
-        SelectedConfig = nil
-        refreshDropdown()
-        notify("Config", "Deleted: " .. name)
-    end,
-})
-ConfigTab:Section({Title = "AUTO LOAD"})
-ConfigTab:Toggle({
-    Title = "Auto Load Config",
-    Default = false,
-    Callback = function(value)
-        AutoLoadEnabled = value
-        saveAutoLoad()
-    end,
-})
-ConfigTab:Paragraph({
-    Title = "Auto Load",
-    Desc = "When enabled, the selected config loads automatically the next time you run the script in THIS game.",
-    Image = "info",
-})
-task.spawn(function()
-    task.wait(1)
-    if not canFile or not isfile(AUTOLOAD_FILE) then return end
-    local ok, data = pcall(function()
-        return HttpService:JSONDecode(readfile(AUTOLOAD_FILE))
+        btn.Parent = scroller
+    end
+
+    task.delay(10, function()
+        if popup and popup.Parent then popup:Destroy() end
     end)
-    if ok and type(data) == "table" and data.enabled and data.name then
-        SelectedConfig = data.name
-        AutoLoadEnabled = true
-        if not table.find(ConfigNames, data.name) then
-            table.insert(ConfigNames, data.name)
-            refreshDropdown()
-        end
-        pcall(function() ConfigDropdown:Select(data.name) end)
-        if loadConfig(data.name) then
-            notify("Auto Load", "Loaded config: " .. data.name)
-        end
+end
+
+local function injectTopBarControls()
+    local gui, titleLabel = findAirflowScreenGui()
+    if not gui or not titleLabel then return end
+    local exitBtn = findExitButton(gui, titleLabel)
+    if not exitBtn then return end
+    local bar = exitBtn.Parent
+    if not bar then return end
+    if bar:FindFirstChild("NexyroControls") then return end
+
+    local container = Instance.new("Frame")
+    container.Name = "NexyroControls"
+    container.BackgroundTransparency = 1
+    container.AnchorPoint = Vector2.new(1, 0.5)
+
+    local exPos, exSize, exAnchor = exitBtn.Position, exitBtn.Size, exitBtn.AnchorPoint
+    if exAnchor.X >= 0.5 then
+        container.Position = UDim2.new(exPos.X.Scale, exPos.X.Offset - exSize.X.Offset - 8, exPos.Y.Scale, exPos.Y.Offset)
+    else
+        container.Position = UDim2.new(exPos.X.Scale, exPos.X.Offset - 50, exPos.Y.Scale, exPos.Y.Offset)
+    end
+    container.Size = UDim2.new(0, 42, 0, math.max(exSize.Y.Offset, 24))
+    container.ZIndex = 999
+    container.Parent = bar
+
+    local colorBtn = Instance.new("TextButton")
+    colorBtn.Name = "ColorBtn"
+    colorBtn.Size = UDim2.new(0, 38, 1, 0)
+    colorBtn.Position = UDim2.new(0, 0, 0, 0)
+    colorBtn.BackgroundColor3 = currentBgColor
+    colorBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    colorBtn.Text = "BG"
+    colorBtn.Font = Enum.Font.GothamBold
+    colorBtn.TextSize = 14
+    colorBtn.BorderSizePixel = 0
+    colorBtn.ZIndex = 1000
+    colorBtn.AutoButtonColor = true
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 6); c.Parent = colorBtn
+    colorBtn.Parent = container
+
+    colorBtn.MouseButton1Click:Connect(function()
+        local popup = gui:FindFirstChild("NexyroPopup")
+        if popup then popup:Destroy(); return end
+        createTopPopup(gui, colorBtn, COLOR_PRESETS, function(item)
+            currentBgColor = item.Color
+            colorBtn.BackgroundColor3 = item.Color
+            applyBackgroundColor(item.Color)
+            notify("Background", "Color: " .. item.Name, "Success")
+        end, "Select Background")
+    end)
+end
+
+task.spawn(function()
+    for _ = 1, 20 do
+        task.wait(0.5)
+        pcall(injectTopBarControls)
+        local gui = findAirflowScreenGui()
+        if gui and gui:FindFirstChild("NexyroControls", true) then break end
     end
 end)
+task.spawn(function()
+    while true do
+        task.wait(5)
+        pcall(injectTopBarControls)
+    end
+end)
+
+notify(TITLE .. " " .. VERSION, "Loaded successfully - by Nexyro " .. VERIFIED, "Success")
