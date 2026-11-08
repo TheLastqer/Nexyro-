@@ -1,0 +1,566 @@
+local Airflow = loadstring(game:HttpGet("https://raw.githubusercontent.com/PookiePepelsss/Airflow-UI/refs/heads/main/Source.luau"))()
+
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+local Stats = game:GetService("Stats")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local VERIFIED = "\u{E000}"
+local VERSION = "v1.0"
+local TITLE = "Fish A Net"
+local TAG = "BETA | UPDATING COMING"
+
+local Window = Airflow:CreateWindow({
+    Name = TITLE,
+    LoadingSubtitle = "by Nexyro " .. VERIFIED .. "  |  " .. TAG,
+    Icon = "radio",
+    ToggleUIKeybind = "RightControl",
+    Size = UDim2.fromOffset(640, 420),
+    Search = true,
+    OpenButton = { Title = TITLE, Icon = "radio" },
+    Loading = {
+        Enabled = true,
+        Title = TITLE .. " " .. VERSION,
+        Text = TAG,
+        Steps = { "Preparing interface", "Loading features", "Almost there" },
+        Duration = 1.6,
+    },
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "NexyroFishingHub",
+        FileName = "default",
+    },
+})
+
+local function notify(title, content, kind)
+    pcall(function()
+        Window:Notify({Title = title, Content = content, Type = kind or "Info", Duration = 4})
+    end)
+end
+
+local Settings = {
+    WalkSpeedEnabled = false,
+    WalkSpeed = 16,
+    FlyEnabled = false,
+    FlySpeed = 50,
+    AutoHop = false,
+    HopInterval = 120,
+    AutoRejoin = false,
+    ThrowDelay = 1,
+    BaitName = "Crumbs",
+    BaitAmount = 1,
+}
+
+local function getHumanoid()
+    local character = Player.Character
+    return character and character:FindFirstChildOfClass("Humanoid")
+end
+local function getRoot()
+    local character = Player.Character
+    return character and character:FindFirstChild("HumanoidRootPart")
+end
+
+-- ================= HOME TAB =================
+local Home = Window:CreateTab({Name = "Home", Icon = "house"})
+
+Home:CreateSection("STATUS")
+Home:CreateParagraph({
+    Title = "BETA",
+    Content = "Updating coming",
+})
+
+Home:CreateSection("PROFILE")
+Home:CreateParagraph({
+    Title = "Welcome, " .. Player.DisplayName,
+    Content = "Username: @" .. Player.Name
+        .. "\nDisplay Name: " .. Player.DisplayName
+        .. "\nUser ID: " .. Player.UserId
+        .. "\nAccount Age: " .. Player.AccountAge .. " days",
+})
+
+Home:CreateSection("GAME INFORMATION")
+local success, gameInfo = pcall(function()
+    return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId)
+end)
+Home:CreateParagraph({
+    Title = "Current Game",
+    Content = "Game Name: " .. (success and gameInfo.Name or "Unknown")
+        .. "\nGame ID: " .. game.PlaceId
+        .. "\nPlace ID: " .. game.PlaceId,
+})
+
+Home:CreateSection("SESSION")
+local startTime = os.clock()
+Home:CreateLabel({
+    Text = "Time Playing: 00:00:00",
+    UpdateRate = 1,
+    Update = function()
+        local elapsed = math.floor(os.clock() - startTime)
+        return string.format("Time Playing: %02d:%02d:%02d", math.floor(elapsed / 3600), math.floor((elapsed % 3600) / 60), elapsed % 60)
+    end,
+})
+Home:CreateLabel({
+    Text = "Ping: -- MS",
+    UpdateRate = 2,
+    Update = function()
+        local ok, value = pcall(function()
+            return Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
+        end)
+        if ok and value then
+            return "Ping: " .. math.floor(value) .. " MS"
+        end
+        return "Ping: -- MS"
+    end,
+})
+
+Home:CreateSection("CREDITS")
+Home:CreateParagraph({
+    Title = "Credit By Nexyro " .. VERIFIED,
+    Content = "Version: 1.0 (BETA)",
+})
+
+-- ================= UPDATES TAB =================
+local UpdatesTab = Window:CreateTab({Name = "Updates", Icon = "megaphone"})
+
+UpdatesTab:CreateSection("UPDATES")
+UpdatesTab:CreateParagraph({
+    Title = "V1.0 RELEASE",
+    Content = "[+] Auto Throw Net\n"
+        .. "[+] Auto Equip Best\n"
+        .. "[+] Auto Collect Cash\n"
+        .. "[+] Auto Rebirth\n"
+        .. "[+] Auto Buy Net and Bait\n"
+        .. "[+] Auto Upgrade: Fishing, Market, Spear Gun, Fisherman\n"
+        .. "[+] Player tools, Server tools and Config system",
+})
+
+-- ================= REMOTE HELPERS =================
+local function getRemote(name)
+    local folder = ReplicatedStorage:FindFirstChild("Remotes")
+    return folder and folder:FindFirstChild(name)
+end
+
+-- fires or invokes a remote by name, never blocks the caller and never errors
+local function send(name, ...)
+    local remote = getRemote(name)
+    if not remote then return false end
+    local args = table.pack(...)
+    if remote:IsA("RemoteFunction") then
+        task.spawn(function()
+            pcall(function()
+                remote:InvokeServer(table.unpack(args, 1, args.n))
+            end)
+        end)
+    else
+        pcall(function()
+            remote:FireServer(table.unpack(args, 1, args.n))
+        end)
+    end
+    return true
+end
+
+-- builds a toggle that repeats Run(alive) until it is switched off
+local function loopToggle(tab, o)
+    local token = 0
+    tab:CreateToggle({
+        Name = o.Name,
+        CurrentValue = false,
+        Flag = o.Flag,
+        Callback = function(Value)
+            token = token + 1
+            local myToken = token
+            if Value then
+                task.spawn(function()
+                    local function alive()
+                        return token == myToken
+                    end
+                    while alive() do
+                        pcall(o.Run, alive)
+                        local wait = o.Interval or 1
+                        if type(wait) == "function" then wait = wait() end
+                        task.wait(wait)
+                    end
+                end)
+            end
+        end,
+    })
+end
+
+-- sends one remote call per item in the list, with a short gap between them
+local function sendEach(alive, remoteName, items, buildArgs, gap)
+    for _, item in ipairs(items) do
+        if not alive() then break end
+        send(remoteName, table.unpack(buildArgs(item)))
+        task.wait(gap or 0.15)
+    end
+end
+
+-- ================= MAIN FEATURES TAB =================
+local Features = Window:CreateTab({Name = "Main Features", Icon = "zap"})
+
+Features:CreateSection("AUTO FISH")
+
+Features:CreateSlider({
+    Name = "Throw Net Delay",
+    Range = {0.1, 5},
+    Increment = 0.1,
+    Suffix = " s",
+    CurrentValue = Settings.ThrowDelay,
+    Flag = "ThrowDelay",
+    Callback = function(Value)
+        Settings.ThrowDelay = Value
+    end,
+})
+
+loopToggle(Features, {
+    Name = "Auto Throw Net",
+    Flag = "AutoThrowNet",
+    Interval = function() return Settings.ThrowDelay end,
+    Run = function()
+        send("ThrowNet", 315.09698486328125, 5.9842773437500014)
+    end,
+})
+
+loopToggle(Features, {
+    Name = "Auto Equip Best",
+    Flag = "AutoEquipBest",
+    Interval = 5,
+    Run = function()
+        send("BestSetup")
+    end,
+})
+
+loopToggle(Features, {
+    Name = "Auto Collect Cash",
+    Flag = "AutoCollectCash",
+    Interval = 1,
+    Run = function(alive)
+        local pads = {}
+        for i = 1, 10 do pads[i] = i end
+        sendEach(alive, "CollectPadReq", pads, function(pad) return {pad} end, 0.1)
+    end,
+})
+
+loopToggle(Features, {
+    Name = "Auto Rebirth",
+    Flag = "AutoRebirth",
+    Interval = 3,
+    Run = function()
+        send("RebirthRequest")
+    end,
+})
+
+Features:CreateSection("AUTO BUY")
+
+loopToggle(Features, {
+    Name = "Auto Buy Net (1 to 50)",
+    Flag = "AutoBuyNet",
+    Interval = 1,
+    Run = function(alive)
+        local nets = {}
+        for i = 1, 50 do nets[i] = i end
+        sendEach(alive, "BuyItem", nets, function(n) return {"Net", n} end, 0.1)
+    end,
+})
+
+local BAIT_NAMES = {"Crumbs", "Crawlers", "Chum"}
+local BAIT_AMOUNTS = {
+    ["Buy 1"] = 1,
+    ["Buy 10"] = 10,
+    ["Buy 500"] = 500,
+}
+local BAIT_AMOUNT_LIST = {"Buy 1", "Buy 10", "Buy 500"}
+
+Features:CreateDropdown({
+    Name = "Select Bait",
+    Options = BAIT_NAMES,
+    CurrentOption = Settings.BaitName,
+    Flag = "BaitName",
+    Callback = function(Option)
+        if type(Option) == "table" then Option = Option[1] end
+        if Option then Settings.BaitName = Option end
+    end,
+})
+
+Features:CreateDropdown({
+    Name = "Bait Amount",
+    Options = BAIT_AMOUNT_LIST,
+    CurrentOption = "Buy 1",
+    Flag = "BaitAmount",
+    Callback = function(Option)
+        if type(Option) == "table" then Option = Option[1] end
+        if Option and BAIT_AMOUNTS[Option] then
+            Settings.BaitAmount = BAIT_AMOUNTS[Option]
+        end
+    end,
+})
+
+loopToggle(Features, {
+    Name = "Auto Buy Bait",
+    Flag = "AutoBuyBait",
+    Interval = 1,
+    Run = function()
+        send("Tackle", "buyBait", Settings.BaitName, Settings.BaitAmount)
+    end,
+})
+
+Features:CreateSection("AUTO UPGRADE")
+
+local FISHING_UPGRADES = {"Reel", "Luck", "Walk", "Weave", "BigBait", "Twin", "Golden"}
+local MARKET_UPGRADES = {"Sell", "Bulk", "Treasure"}
+local SPEAR_UPGRADES = {"Tip", "Multi", "Reload", "Range"}
+local FISHERMAN_UPGRADES = {"Rod", "Line", "Speed", "Range"}
+
+loopToggle(Features, {
+    Name = "Auto Upgrade Fishing",
+    Flag = "AutoUpgradeFishing",
+    Interval = 1,
+    Run = function(alive)
+        sendEach(alive, "BuyItem", FISHING_UPGRADES, function(name) return {"Upgrade", name} end, 0.2)
+    end,
+})
+
+loopToggle(Features, {
+    Name = "Auto Upgrade Market",
+    Flag = "AutoUpgradeMarket",
+    Interval = 1,
+    Run = function(alive)
+        sendEach(alive, "BuyItem", MARKET_UPGRADES, function(name) return {"Upgrade", name} end, 0.2)
+    end,
+})
+
+loopToggle(Features, {
+    Name = "Auto Upgrade Spear Gun",
+    Flag = "AutoUpgradeSpear",
+    Interval = 1,
+    Run = function(alive)
+        sendEach(alive, "SpearAction", SPEAR_UPGRADES, function(name) return {"buy", name} end, 0.2)
+    end,
+})
+
+loopToggle(Features, {
+    Name = "Auto Upgrade Fisherman",
+    Flag = "AutoUpgradeFisherman",
+    Interval = 1,
+    Run = function(alive)
+        sendEach(alive, "HelperAction", FISHERMAN_UPGRADES, function(name) return {"buy", name} end, 0.2)
+    end,
+})
+
+-- ================= PLAYER TAB =================
+local PlayerTab = Window:CreateTab({Name = "Player", Icon = "user"})
+
+PlayerTab:CreateSection("WALK SPEED")
+PlayerTab:CreateSlider({
+    Name = "Speed",
+    Range = {1, 250},
+    Increment = 1,
+    CurrentValue = Settings.WalkSpeed,
+    Flag = "WalkSpeed",
+    Callback = function(Value)
+        Settings.WalkSpeed = Value
+    end,
+})
+PlayerTab:CreateToggle({
+    Name = "Enable Speed",
+    CurrentValue = false,
+    Flag = "WalkSpeedEnabled",
+    Callback = function(Value)
+        Settings.WalkSpeedEnabled = Value
+        if not Value then
+            local hum = getHumanoid()
+            if hum then hum.WalkSpeed = 16 end
+        end
+    end,
+})
+RunService.Heartbeat:Connect(function()
+    if Settings.WalkSpeedEnabled then
+        local hum = getHumanoid()
+        if hum and hum.WalkSpeed ~= Settings.WalkSpeed then
+            hum.WalkSpeed = Settings.WalkSpeed
+        end
+    end
+end)
+
+PlayerTab:CreateSection("FLY")
+local flyConnection, flyVelocity, flyGyro
+local function stopFly()
+    if flyConnection then flyConnection:Disconnect() flyConnection = nil end
+    if flyVelocity then flyVelocity:Destroy() flyVelocity = nil end
+    if flyGyro then flyGyro:Destroy() flyGyro = nil end
+    local hum = getHumanoid()
+    if hum then hum.PlatformStand = false end
+end
+local function startFly()
+    stopFly()
+    flyConnection = RunService.RenderStepped:Connect(function()
+        local root = getRoot()
+        local hum = getHumanoid()
+        local camera = workspace.CurrentCamera
+        if not root or not hum or not camera then return end
+        if not flyVelocity or flyVelocity.Parent ~= root then
+            if flyVelocity then flyVelocity:Destroy() end
+            flyVelocity = Instance.new("BodyVelocity")
+            flyVelocity.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+            flyVelocity.Velocity = Vector3.zero
+            flyVelocity.Parent = root
+        end
+        if not flyGyro or flyGyro.Parent ~= root then
+            if flyGyro then flyGyro:Destroy() end
+            flyGyro = Instance.new("BodyGyro")
+            flyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+            flyGyro.P = 9e4
+            flyGyro.Parent = root
+        end
+        hum.PlatformStand = true
+        flyGyro.CFrame = camera.CFrame
+        local direction = Vector3.zero
+        local move = hum.MoveDirection
+        if move.Magnitude > 0 then
+            local relative = camera.CFrame:VectorToObjectSpace(move)
+            direction = direction + camera.CFrame.RightVector * relative.X + camera.CFrame.LookVector * (-relative.Z)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            direction = direction + Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+            direction = direction - Vector3.new(0, 1, 0)
+        end
+        if direction.Magnitude > 0 then
+            flyVelocity.Velocity = direction.Unit * Settings.FlySpeed
+        else
+            flyVelocity.Velocity = Vector3.zero
+        end
+    end)
+end
+PlayerTab:CreateSlider({
+    Name = "Fly Speed",
+    Range = {1, 250},
+    Increment = 1,
+    CurrentValue = Settings.FlySpeed,
+    Flag = "FlySpeed",
+    Callback = function(Value)
+        Settings.FlySpeed = Value
+    end,
+})
+PlayerTab:CreateToggle({
+    Name = "Enable Fly",
+    CurrentValue = false,
+    Flag = "FlyEnabled",
+    Callback = function(Value)
+        Settings.FlyEnabled = Value
+        if Value then startFly() else stopFly() end
+    end,
+})
+Player.CharacterAdded:Connect(function()
+    task.wait(1)
+    if Settings.FlyEnabled then startFly() end
+end)
+
+PlayerTab:CreateSection("SERVER")
+local function rejoinServer()
+    notify("Rejoin", "Rejoining server...")
+    if #Players:GetPlayers() <= 1 then
+        Player:Kick("\nRejoining...")
+        task.wait()
+        TeleportService:Teleport(game.PlaceId, Player)
+    else
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Player)
+    end
+end
+local function hopServer()
+    notify("Server Hop", "Searching for a new server...")
+    local ok, result = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
+    end)
+    if not ok or not result or not result.data then
+        notify("Server Hop", "Could not fetch the server list.", "Error")
+        return false
+    end
+    local candidates = {}
+    for _, server in ipairs(result.data) do
+        if server.id ~= game.JobId and server.playing and server.maxPlayers and server.playing < server.maxPlayers then
+            table.insert(candidates, server.id)
+        end
+    end
+    if #candidates == 0 then
+        notify("Server Hop", "No other servers found.", "Warning")
+        return false
+    end
+    TeleportService:TeleportToPlaceInstance(game.PlaceId, candidates[math.random(1, #candidates)], Player)
+    return true
+end
+PlayerTab:CreateButton({Name = "Rejoin Server", Icon = "refresh-cw", Callback = rejoinServer})
+PlayerTab:CreateButton({Name = "Server Hop", Icon = "shuffle", Callback = hopServer})
+
+local hopToken = 0
+PlayerTab:CreateSlider({
+    Name = "Auto Hop Interval",
+    Range = {30, 600},
+    Increment = 5,
+    Suffix = " s",
+    CurrentValue = Settings.HopInterval,
+    Flag = "HopInterval",
+    Callback = function(Value)
+        Settings.HopInterval = Value
+    end,
+})
+PlayerTab:CreateToggle({
+    Name = "Auto Server Hop",
+    CurrentValue = false,
+    Flag = "AutoHop",
+    Callback = function(Value)
+        Settings.AutoHop = Value
+        hopToken = hopToken + 1
+        if Value then
+            local myToken = hopToken
+            task.spawn(function()
+                while Settings.AutoHop and hopToken == myToken do
+                    local remaining = Settings.HopInterval
+                    while remaining > 0 and Settings.AutoHop and hopToken == myToken do
+                        task.wait(1)
+                        remaining = remaining - 1
+                    end
+                    if Settings.AutoHop and hopToken == myToken then
+                        hopServer()
+                        task.wait(10)
+                    end
+                end
+            end)
+        end
+    end,
+})
+PlayerTab:CreateToggle({
+    Name = "Auto Rejoin (on disconnect)",
+    CurrentValue = false,
+    Flag = "AutoRejoin",
+    Callback = function(Value)
+        Settings.AutoRejoin = Value
+    end,
+})
+pcall(function()
+    local overlay = game:GetService("CoreGui"):WaitForChild("RobloxPromptGui"):WaitForChild("promptOverlay")
+    overlay.ChildAdded:Connect(function(child)
+        if Settings.AutoRejoin and child.Name == "ErrorPrompt" then
+            task.wait(2)
+            rejoinServer()
+        end
+    end)
+end)
+
+-- ================= CONFIG TAB =================
+local ConfigTab = Window:CreateTab({Name = "Config", Icon = "settings"})
+ConfigTab:CreateSection("CONFIGS")
+ConfigTab:CreateConfigManager({Name = "Configs"})
+
+pcall(function() Window:LoadConfig() end)
+
+if not getRemote("ThrowNet") then
+    notify("Warning", "Remotes folder not found. Join the fishing game first.", "Warning")
+end
+
+notify(TITLE .. " " .. VERSION, TAG, "Success")
