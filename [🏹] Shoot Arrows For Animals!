@@ -1,0 +1,929 @@
+local Airflow = loadstring(game:HttpGet("https://raw.githubusercontent.com/PookiePepelsss/Airflow-UI/refs/heads/main/Source.luau"))()
+
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+local Stats = game:GetService("Stats")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CoreGui = game:GetService("CoreGui")
+
+local VERIFIED = "\u{E000}"
+local VERSION = "v1.0"
+local TITLE = "[🏹] Shoot Arrows For Animals!"
+local DISCORD_INVITE = "https://discord.gg/4rQnT9ehUe"
+local DISCORD_CODE = "4rQnT9ehUe"
+
+local Window = Airflow:CreateWindow({
+    Name = TITLE,
+    LoadingSubtitle = "by Nexyro " .. VERIFIED,
+    Icon = "radio",
+    ToggleUIKeybind = "RightControl",
+    Size = UDim2.fromOffset(640, 420),
+    Search = true,
+    OpenButton = { Title = TITLE, Icon = "radio" },
+    Loading = {
+        Enabled = true,
+        Title = TITLE .. " " .. VERSION,
+        Text = "Starting",
+        Steps = { "Preparing interface", "Loading features", "Almost there" },
+        Duration = 1.6,
+    },
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "NexyroShootArrows",
+        FileName = "default",
+    },
+})
+
+local function notify(title, content, kind)
+    pcall(function()
+        Window:Notify({Title = title, Content = content, Type = kind or "Info", Duration = 4})
+    end)
+end
+
+local Settings = {
+    WalkSpeedEnabled = false, WalkSpeed = 16,
+    FlyEnabled = false, FlySpeed = 50,
+    AutoHop = false, HopInterval = 120, AutoRejoin = false,
+}
+
+local function getHumanoid()
+    local character = Player.Character
+    return character and character:FindFirstChildOfClass("Humanoid")
+end
+local function getRoot()
+    local character = Player.Character
+    return character and character:FindFirstChild("HumanoidRootPart")
+end
+
+local function addDivider(tab)
+    if not tab then return end
+    local ok = pcall(function() tab:CreateDivider() end)
+    if ok then return end
+    pcall(function()
+        tab:CreateParagraph({
+            Title = "─────────────────────────────────────────",
+            Content = "",
+        })
+    end)
+end
+
+local function findAirflowScreenGui()
+    local containers = {CoreGui}
+    local pg = Player:FindFirstChild("PlayerGui")
+    if pg then table.insert(containers, pg) end
+    for _, container in ipairs(containers) do
+        for _, gui in ipairs(container:GetChildren()) do
+            if gui:IsA("ScreenGui") then
+                for _, d in ipairs(gui:GetDescendants()) do
+                    if d:IsA("TextLabel") and d.Text == TITLE then
+                        return gui, d
+                    end
+                end
+            end
+        end
+    end
+    return nil, nil
+end
+
+-- ================= INFORMATION TAB =================
+local Home = Window:CreateTab({Name = "Information", Icon = "house"})
+
+Home:CreateSection("PROFILE")
+Home:CreateParagraph({
+    Title = "Welcome, " .. Player.DisplayName,
+    Content = "Username: @" .. Player.Name
+        .. "\nDisplay Name: " .. Player.DisplayName
+        .. "\nUser ID: " .. Player.UserId
+        .. "\nAccount Age: " .. Player.AccountAge .. " days",
+})
+addDivider(Home)
+
+Home:CreateSection("GAME INFORMATION")
+local success, gameInfo = pcall(function()
+    return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId)
+end)
+Home:CreateParagraph({
+    Title = "Current Game",
+    Content = "Game Name: " .. (success and gameInfo.Name or "Unknown")
+        .. "\nGame ID: " .. game.PlaceId
+        .. "\nPlace ID: " .. game.PlaceId,
+})
+addDivider(Home)
+
+Home:CreateSection("SESSION")
+local startTime = os.clock()
+Home:CreateLabel({
+    Text = "Time Playing: 00:00:00",
+    UpdateRate = 1,
+    Update = function()
+        local elapsed = math.floor(os.clock() - startTime)
+        return string.format("Time Playing: %02d:%02d:%02d", math.floor(elapsed / 3600), math.floor((elapsed % 3600) / 60), elapsed % 60)
+    end,
+})
+Home:CreateLabel({
+    Text = "Ping: -- MS",
+    UpdateRate = 2,
+    Update = function()
+        local ok, value = pcall(function()
+            return Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
+        end)
+        if ok and value then
+            return "Ping: " .. math.floor(value) .. " MS"
+        end
+        return "Ping: -- MS"
+    end,
+})
+addDivider(Home)
+
+Home:CreateSection("COMMUNITY")
+Home:CreateButton({
+    Name = "Join Our Discord Server",
+    Icon = "message-circle",
+    Callback = function()
+        pcall(function() setclipboard(DISCORD_INVITE) end)
+        notify("Discord", "Invite link copied: " .. DISCORD_INVITE, "Success")
+    end,
+})
+addDivider(Home)
+
+Home:CreateSection("CREDITS")
+Home:CreateParagraph({
+    Title = "Credit By Nexyro " .. VERIFIED,
+    Content = "Version: 1.0",
+})
+
+-- ================= UPDATES TAB =================
+local UpdatesTab = Window:CreateTab({Name = "Updates", Icon = "megaphone"})
+
+UpdatesTab:CreateSection("LATEST UPDATE")
+UpdatesTab:CreateParagraph({
+    Title = "Version 1.0",
+    Content = "Initial release for [🏹] Shoot Arrows For Animals!\n\n"
+        .. "Features:\n"
+        .. "  - Auto Shot Fast \n"
+        .. "  - Auto Buy Bow \n"
+        .. "  - Auto Equip Best\n"
+        .. "  - Auto Upgrade Train\n"
+        .. "  - Auto Upgrade Plot (Fence)\n"
+        .. "  - Fly & Walk Speed\n"
+        .. "  - Server Rejoin / Hop / Auto-Hop / Auto-Rejoin\n"
+        .. "  - Discord tab with invite link and live server stats\n"
+        .. "  - Background color selector next to exit button\n"
+        .. "  - Config saving / loading",
+})
+
+UpdatesTab:CreateSection("CHANGELOG")
+UpdatesTab:CreateParagraph({
+    Title = "Version 1.0",
+    Content = "  - Fresh rebrand to [🏹] Shoot Arrows For Animals!\n"
+        .. "  - Removed old Auto Train toggle\n"
+        .. "  - All toggles loop while ON and stop instantly when turned OFF\n"
+        .. "  - Mutual-safe toggling (no conflicts)",
+})
+
+-- ================= DISCORD TAB =================
+local DiscordTab = Window:CreateTab({Name = "Discord", Icon = "message-circle"})
+
+DiscordTab:CreateSection("OUR COMMUNITY")
+DiscordTab:CreateParagraph({
+    Title = "Nexyro's Discord Server",
+    Content = "Join the official community for:\n"
+        .. "  - Script updates and early access\n"
+        .. "  - Support and troubleshooting\n"
+        .. "  - Giveaways and events\n"
+        .. "  - Chat with other users\n\n"
+        .. "Invite Link:\n" .. DISCORD_INVITE,
+})
+DiscordTab:CreateButton({
+    Name = "Copy Invite Link",
+    Icon = "copy",
+    Callback = function()
+        local ok = pcall(function() setclipboard(DISCORD_INVITE) end)
+        if ok then
+            notify("Discord", "Invite link copied to clipboard.", "Success")
+        else
+            notify("Discord", "Could not copy. Link: " .. DISCORD_INVITE, "Warning")
+        end
+    end,
+})
+DiscordTab:CreateButton({
+    Name = "Open Invite in Browser",
+    Icon = "external-link",
+    Callback = function()
+        pcall(function() setclipboard(DISCORD_INVITE) end)
+        notify("Discord", "Link copied. Paste it in your browser.", "Info")
+    end,
+})
+
+DiscordTab:CreateSection("SERVER STATS")
+
+local discordStats = {Total = "...", Online = "...", Offline = "...", Available = false, LastRefresh = 0}
+
+DiscordTab:CreateLabel({
+    Text = "👥 Total Members: ...",
+    UpdateRate = 2,
+    Update = function() return "👥 Total Members: " .. tostring(discordStats.Total) end,
+})
+DiscordTab:CreateLabel({
+    Text = "🟢 Active (Online): ...",
+    UpdateRate = 2,
+    Update = function() return "🟢 Active (Online): " .. tostring(discordStats.Online) end,
+})
+DiscordTab:CreateLabel({
+    Text = "⚫ Inactive (Offline): ...",
+    UpdateRate = 2,
+    Update = function() return "⚫ Inactive (Offline): " .. tostring(discordStats.Offline) end,
+})
+DiscordTab:CreateLabel({
+    Text = "🔄 Last Refresh: --",
+    UpdateRate = 2,
+    Update = function()
+        if discordStats.LastRefresh == 0 then return "🔄 Last Refresh: --" end
+        local ago = math.floor(os.clock() - discordStats.LastRefresh)
+        return "🔄 Last Refresh: " .. ago .. "s ago"
+    end,
+})
+
+local function fetchDiscordStats()
+    local ok, response = pcall(function()
+        return game:HttpGet("https://discord.com/api/v9/invites/" .. DISCORD_CODE .. "?with_counts=true&with_expiration=true")
+    end)
+    if not ok or not response or type(response) ~= "string" or #response < 4 then
+        discordStats.Total = "Unavailable"
+        discordStats.Online = "Unavailable"
+        discordStats.Offline = "Unavailable"
+        return
+    end
+    local decoded
+    local decodeOk = pcall(function() decoded = HttpService:JSONDecode(response) end)
+    if not decodeOk or not decoded or not decoded.approximate_member_count then
+        discordStats.Total = "Unavailable"
+        discordStats.Online = "Unavailable"
+        discordStats.Offline = "Unavailable"
+        return
+    end
+    local total = tonumber(decoded.approximate_member_count) or 0
+    local online = tonumber(decoded.approximate_presence_count) or 0
+    discordStats.Total = tostring(total)
+    discordStats.Online = tostring(online)
+    discordStats.Offline = tostring(math.max(0, total - online))
+    discordStats.Available = true
+    discordStats.LastRefresh = os.clock()
+end
+
+task.spawn(function()
+    fetchDiscordStats()
+    while true do
+        task.wait(60)
+        fetchDiscordStats()
+    end
+end)
+
+-- ================= MAIN FEATURES TAB =================
+local Features = Window:CreateTab({Name = "Main Features", Icon = "zap"})
+
+-- -------- AUTO SHOT --------
+Features:CreateSection("AUTO SHOT")
+
+local autoShotEnabled = false
+local autoShotToken = 0
+
+Features:CreateToggle({
+    Name = "Auto Shot",
+    CurrentValue = false,
+    Flag = "AutoShot",
+    Callback = function(Value)
+        autoShotToken = autoShotToken + 1
+        local myToken = autoShotToken
+        autoShotEnabled = Value
+
+        if not Value then
+            notify("Auto Shot", "Stopped.", "Info")
+            return
+        end
+
+        notify("Auto Shot", "Started. Turn OFF to stop.", "Success")
+        task.spawn(function()
+            while autoShotEnabled and autoShotToken == myToken do
+                local ok, err = pcall(function()
+                    local char = Player.Character or Player.CharacterAdded:Wait()
+                    local root = char:WaitForChild("HumanoidRootPart", 10)
+                    if not root then error("No HumanoidRootPart") end
+
+                    local starterArea = workspace:WaitForChild("StarterArea", 10)
+                    local remotes = ReplicatedStorage:WaitForChild("Remotes", 10)
+                    if not remotes then error("No Remotes folder") end
+                    local shot = remotes:WaitForChild("Shot", 10)
+                    if not shot then error("No Shot remote") end
+
+                    if not autoShotEnabled or autoShotToken ~= myToken then return end
+
+                    local target = starterArea:IsA("BasePart") and starterArea
+                        or starterArea:FindFirstChildWhichIsA("BasePart", true)
+                    if target then
+                        char:PivotTo(target.CFrame + Vector3.new(0, 3, 0))
+                    end
+
+                    task.wait(0.15)
+                    if not autoShotEnabled or autoShotToken ~= myToken then return end
+
+                    shot:WaitForChild("MeterStarted", 10):FireServer()
+                    task.wait(0.1)
+                    if not autoShotEnabled or autoShotToken ~= myToken then return end
+
+                    shot:WaitForChild("Start", 10):InvokeServer(0.9772802309476661)
+                    task.wait(0.1)
+                    if not autoShotEnabled or autoShotToken ~= myToken then return end
+
+                    shot:WaitForChild("Complete", 10):InvokeServer({ Skipped = true })
+                end)
+
+                if not ok then
+                    warn("[AutoShot] " .. tostring(err))
+                    notify("Auto Shot", "Failed: " .. tostring(err), "Error")
+                end
+
+                local waited = 0
+                while waited < 1.0 and autoShotEnabled and autoShotToken == myToken do
+                    task.wait(0.1)
+                    waited = waited + 0.1
+                end
+            end
+        end)
+    end,
+})
+
+-- -------- AUTO BUY BOW (1-96) --------
+Features:CreateSection("AUTO BUY BOW")
+
+local buyBowEnabled = false
+local buyBowToken = 0
+local BOW_MIN, BOW_MAX = 1, 96
+
+Features:CreateToggle({
+    Name = "Auto Buy Bow ",
+    CurrentValue = false,
+    Flag = "AutoBuyBow",
+    Callback = function(Value)
+        buyBowToken = buyBowToken + 1
+        local myToken = buyBowToken
+        buyBowEnabled = Value
+
+        if not Value then
+            notify("Auto Buy Bow", "Stopped.", "Info")
+            return
+        end
+
+        notify("Auto Buy Bow", "Started. Turn OFF to stop.", "Success")
+        task.spawn(function()
+            while buyBowEnabled and buyBowToken == myToken do
+                local ok, err = pcall(function()
+                    local remotes = ReplicatedStorage:WaitForChild("Remotes", 10)
+                    if not remotes then error("No Remotes folder") end
+                    local buyBow = remotes:WaitForChild("Shop", 10):WaitForChild("BuyBow", 10)
+                    if not buyBow then error("No BuyBow remote") end
+
+                    for i = BOW_MIN, BOW_MAX do
+                        if not buyBowEnabled or buyBowToken ~= myToken then break end
+                        pcall(function() buyBow:InvokeServer(i) end)
+                        task.wait(0.08)
+                    end
+                end)
+
+                if not ok then
+                    warn("[AutoBuyBow] " .. tostring(err))
+                    notify("Auto Buy Bow", "Failed: " .. tostring(err), "Error")
+                end
+
+                local waited = 0
+                while waited < 1.0 and buyBowEnabled and buyBowToken == myToken do
+                    task.wait(0.1); waited = waited + 0.1
+                end
+            end
+        end)
+    end,
+})
+
+-- -------- AUTO EQUIP BEST --------
+Features:CreateSection("AUTO EQUIP BEST")
+
+local equipBestEnabled = false
+local equipBestToken = 0
+
+Features:CreateToggle({
+    Name = "Auto Equip Best",
+    CurrentValue = false,
+    Flag = "AutoEquipBest",
+    Callback = function(Value)
+        equipBestToken = equipBestToken + 1
+        local myToken = equipBestToken
+        equipBestEnabled = Value
+
+        if not Value then
+            notify("Auto Equip Best", "Stopped.", "Info")
+            return
+        end
+
+        notify("Auto Equip Best", "Started. Turn OFF to stop.", "Success")
+        task.spawn(function()
+            while equipBestEnabled and equipBestToken == myToken do
+                local ok, err = pcall(function()
+                    local remotes = ReplicatedStorage:WaitForChild("Remotes", 10)
+                    if not remotes then error("No Remotes folder") end
+                    local equipBest = remotes:WaitForChild("Plot", 10):WaitForChild("EquipBest", 10)
+                    if not equipBest then error("No EquipBest remote") end
+                    equipBest:InvokeServer()
+                end)
+
+                if not ok then
+                    warn("[AutoEquipBest] " .. tostring(err))
+                    notify("Auto Equip Best", "Failed: " .. tostring(err), "Error")
+                end
+
+                local waited = 0
+                while waited < 1.0 and equipBestEnabled and equipBestToken == myToken do
+                    task.wait(0.1); waited = waited + 0.1
+                end
+            end
+        end)
+    end,
+})
+
+-- -------- AUTO UPGRADE TRAIN --------
+Features:CreateSection("AUTO UPGRADE TRAIN")
+
+local upgradeTrainEnabled = false
+local upgradeTrainToken = 0
+
+Features:CreateToggle({
+    Name = "Auto Upgrade Train",
+    CurrentValue = false,
+    Flag = "AutoUpgradeTrain",
+    Callback = function(Value)
+        upgradeTrainToken = upgradeTrainToken + 1
+        local myToken = upgradeTrainToken
+        upgradeTrainEnabled = Value
+
+        if not Value then
+            notify("Auto Upgrade Train", "Stopped.", "Info")
+            return
+        end
+
+        notify("Auto Upgrade Train", "Started. Turn OFF to stop.", "Success")
+        task.spawn(function()
+            while upgradeTrainEnabled and upgradeTrainToken == myToken do
+                local ok, err = pcall(function()
+                    local remotes = ReplicatedStorage:WaitForChild("Remotes", 10)
+                    if not remotes then error("No Remotes folder") end
+                    local upgrade = remotes:WaitForChild("Training", 10):WaitForChild("Upgrade", 10)
+                    if not upgrade then error("No Training.Upgrade remote") end
+                    upgrade:InvokeServer()
+                end)
+
+                if not ok then
+                    warn("[AutoUpgradeTrain] " .. tostring(err))
+                    notify("Auto Upgrade Train", "Failed: " .. tostring(err), "Error")
+                end
+
+                local waited = 0
+                while waited < 0.5 and upgradeTrainEnabled and upgradeTrainToken == myToken do
+                    task.wait(0.1); waited = waited + 0.1
+                end
+            end
+        end)
+    end,
+})
+
+-- -------- AUTO UPGRADE PLOT --------
+Features:CreateSection("AUTO UPGRADE PLOT")
+
+local upgradePlotEnabled = false
+local upgradePlotToken = 0
+
+Features:CreateToggle({
+    Name = "Auto Upgrade Plot (Fence)",
+    CurrentValue = false,
+    Flag = "AutoUpgradePlot",
+    Callback = function(Value)
+        upgradePlotToken = upgradePlotToken + 1
+        local myToken = upgradePlotToken
+        upgradePlotEnabled = Value
+
+        if not Value then
+            notify("Auto Upgrade Plot", "Stopped.", "Info")
+            return
+        end
+
+        notify("Auto Upgrade Plot", "Started. Turn OFF to stop.", "Success")
+        task.spawn(function()
+            while upgradePlotEnabled and upgradePlotToken == myToken do
+                local ok, err = pcall(function()
+                    local remotes = ReplicatedStorage:WaitForChild("Remotes", 10)
+                    if not remotes then error("No Remotes folder") end
+                    local fence = remotes:WaitForChild("Plot", 10):WaitForChild("UpgradeFence", 10)
+                    if not fence then error("No Plot.UpgradeFence remote") end
+                    fence:InvokeServer()
+                end)
+
+                if not ok then
+                    warn("[AutoUpgradePlot] " .. tostring(err))
+                    notify("Auto Upgrade Plot", "Failed: " .. tostring(err), "Error")
+                end
+
+                local waited = 0
+                while waited < 0.5 and upgradePlotEnabled and upgradePlotToken == myToken do
+                    task.wait(0.1); waited = waited + 0.1
+                end
+            end
+        end)
+    end,
+})
+
+-- ================= PLAYER TAB =================
+local PlayerTab = Window:CreateTab({Name = "Player", Icon = "user"})
+
+PlayerTab:CreateSection("WALK SPEED")
+PlayerTab:CreateSlider({
+    Name = "Speed", Range = {1, 250}, Increment = 1,
+    CurrentValue = Settings.WalkSpeed, Flag = "WalkSpeed",
+    Callback = function(Value) Settings.WalkSpeed = Value end,
+})
+PlayerTab:CreateToggle({
+    Name = "Enable Speed", CurrentValue = false, Flag = "WalkSpeedEnabled",
+    Callback = function(Value)
+        Settings.WalkSpeedEnabled = Value
+        if not Value then
+            local hum = getHumanoid()
+            if hum then hum.WalkSpeed = 16 end
+        end
+    end,
+})
+RunService.Heartbeat:Connect(function()
+    if Settings.WalkSpeedEnabled then
+        local hum = getHumanoid()
+        if hum and hum.WalkSpeed ~= Settings.WalkSpeed then hum.WalkSpeed = Settings.WalkSpeed end
+    end
+end)
+
+PlayerTab:CreateSection("FLY")
+local flyConnection, flyVelocity, flyGyro
+local function stopFly()
+    if flyConnection then flyConnection:Disconnect() flyConnection = nil end
+    if flyVelocity then flyVelocity:Destroy() flyVelocity = nil end
+    if flyGyro then flyGyro:Destroy() flyGyro = nil end
+    local hum = getHumanoid()
+    if hum then hum.PlatformStand = false end
+end
+local function startFly()
+    stopFly()
+    flyConnection = RunService.RenderStepped:Connect(function()
+        local root = getRoot(); local hum = getHumanoid(); local camera = workspace.CurrentCamera
+        if not root or not hum or not camera then return end
+        if not flyVelocity or flyVelocity.Parent ~= root then
+            if flyVelocity then flyVelocity:Destroy() end
+            flyVelocity = Instance.new("BodyVelocity")
+            flyVelocity.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+            flyVelocity.Velocity = Vector3.zero
+            flyVelocity.Parent = root
+        end
+        if not flyGyro or flyGyro.Parent ~= root then
+            if flyGyro then flyGyro:Destroy() end
+            flyGyro = Instance.new("BodyGyro")
+            flyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+            flyGyro.P = 9e4
+            flyGyro.Parent = root
+        end
+        hum.PlatformStand = true
+        flyGyro.CFrame = camera.CFrame
+        local direction = Vector3.zero
+        local move = hum.MoveDirection
+        if move.Magnitude > 0 then
+            local relative = camera.CFrame:VectorToObjectSpace(move)
+            direction = direction + camera.CFrame.RightVector * relative.X + camera.CFrame.LookVector * (-relative.Z)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then direction = direction + Vector3.new(0, 1, 0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then direction = direction - Vector3.new(0, 1, 0) end
+        if direction.Magnitude > 0 then
+            flyVelocity.Velocity = direction.Unit * Settings.FlySpeed
+        else
+            flyVelocity.Velocity = Vector3.zero
+        end
+    end)
+end
+PlayerTab:CreateSlider({
+    Name = "Fly Speed", Range = {1, 250}, Increment = 1,
+    CurrentValue = Settings.FlySpeed, Flag = "FlySpeed",
+    Callback = function(Value) Settings.FlySpeed = Value end,
+})
+PlayerTab:CreateToggle({
+    Name = "Enable Fly", CurrentValue = false, Flag = "FlyEnabled",
+    Callback = function(Value)
+        Settings.FlyEnabled = Value
+        if Value then startFly() else stopFly() end
+    end,
+})
+Player.CharacterAdded:Connect(function()
+    task.wait(1)
+    if Settings.FlyEnabled then startFly() end
+end)
+
+PlayerTab:CreateSection("SERVER")
+local function rejoinServer()
+    notify("Rejoin", "Rejoining server...")
+    if #Players:GetPlayers() <= 1 then
+        Player:Kick("\nRejoining...")
+        task.wait()
+        TeleportService:Teleport(game.PlaceId, Player)
+    else
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Player)
+    end
+end
+local function hopServer()
+    notify("Server Hop", "Searching for a new server...")
+    local ok, result = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
+    end)
+    if not ok or not result or not result.data then
+        notify("Server Hop", "Could not fetch the server list.", "Error"); return false
+    end
+    local candidates = {}
+    for _, server in ipairs(result.data) do
+        if server.id ~= game.JobId and server.playing and server.maxPlayers and server.playing < server.maxPlayers then
+            table.insert(candidates, server.id)
+        end
+    end
+    if #candidates == 0 then
+        notify("Server Hop", "No other servers found.", "Warning"); return false
+    end
+    TeleportService:TeleportToPlaceInstance(game.PlaceId, candidates[math.random(1, #candidates)], Player)
+    return true
+end
+PlayerTab:CreateButton({Name = "Rejoin Server", Icon = "refresh-cw", Callback = rejoinServer})
+PlayerTab:CreateButton({Name = "Server Hop", Icon = "shuffle", Callback = hopServer})
+
+local hopToken = 0
+PlayerTab:CreateSlider({
+    Name = "Auto Hop Interval", Range = {30, 600}, Increment = 5, Suffix = " s",
+    CurrentValue = Settings.HopInterval, Flag = "HopInterval",
+    Callback = function(Value) Settings.HopInterval = Value end,
+})
+PlayerTab:CreateToggle({
+    Name = "Auto Server Hop", CurrentValue = false, Flag = "AutoHop",
+    Callback = function(Value)
+        Settings.AutoHop = Value
+        hopToken = hopToken + 1
+        if Value then
+            local myToken = hopToken
+            task.spawn(function()
+                while Settings.AutoHop and hopToken == myToken do
+                    local remaining = Settings.HopInterval
+                    while remaining > 0 and Settings.AutoHop and hopToken == myToken do
+                        task.wait(1); remaining = remaining - 1
+                    end
+                    if Settings.AutoHop and hopToken == myToken then hopServer(); task.wait(10) end
+                end
+            end)
+        end
+    end,
+})
+PlayerTab:CreateToggle({
+    Name = "Auto Rejoin (on disconnect)", CurrentValue = false, Flag = "AutoRejoin",
+    Callback = function(Value) Settings.AutoRejoin = Value end,
+})
+pcall(function()
+    local overlay = CoreGui:WaitForChild("RobloxPromptGui"):WaitForChild("promptOverlay")
+    overlay.ChildAdded:Connect(function(child)
+        if Settings.AutoRejoin and child.Name == "ErrorPrompt" then
+            task.wait(2); rejoinServer()
+        end
+    end)
+end)
+
+-- ================= CONFIG TAB =================
+local ConfigTab = Window:CreateTab({Name = "Config", Icon = "settings"})
+ConfigTab:CreateSection("CONFIGS")
+ConfigTab:CreateConfigManager({Name = "Configs"})
+
+pcall(function() Window:LoadConfig() end)
+
+-- =====================================================
+-- TOP BAR: BACKGROUND COLOR BUTTON NEXT TO EXIT
+-- =====================================================
+local COLOR_PRESETS = {
+    {Name = "Dark Navy",     Color = Color3.fromRGB(22, 22, 28)},
+    {Name = "Midnight Blue", Color = Color3.fromRGB(18, 24, 38)},
+    {Name = "Charcoal",      Color = Color3.fromRGB(30, 30, 30)},
+    {Name = "Deep Purple",   Color = Color3.fromRGB(35, 20, 50)},
+    {Name = "Dark Red",      Color = Color3.fromRGB(45, 15, 20)},
+    {Name = "Forest Green",  Color = Color3.fromRGB(20, 40, 25)},
+    {Name = "Ocean Teal",    Color = Color3.fromRGB(15, 35, 45)},
+    {Name = "Pure Black",    Color = Color3.fromRGB(0, 0, 0)},
+    {Name = "Off White",     Color = Color3.fromRGB(240, 240, 245)},
+}
+
+local currentBgColor = Color3.fromRGB(22, 22, 28)
+
+local function findExitButton(gui, titleLabel)
+    local titleY = titleLabel.AbsolutePosition.Y
+    local best, bestRight = nil, -math.huge
+    for _, d in ipairs(gui:GetDescendants()) do
+        if (d:IsA("ImageButton") or d:IsA("TextButton")) and d.Visible then
+            local sz = d.AbsoluteSize
+            if sz.X >= 10 and sz.X <= 55 and math.abs(sz.X - sz.Y) <= 15 then
+                if math.abs(d.AbsolutePosition.Y - titleY) <= 40 then
+                    local rightEdge = d.AbsolutePosition.X + sz.X
+                    if rightEdge > bestRight then best, bestRight = d, rightEdge end
+                end
+            end
+        end
+    end
+    return best
+end
+
+local function getWindowFrame(gui, titleLabel)
+    local node = titleLabel
+    while node and node.Parent and node.Parent ~= gui do
+        node = node.Parent
+    end
+    return node
+end
+
+local function applyBackgroundColor(color)
+    local gui, titleLabel = findAirflowScreenGui()
+    if not gui or not titleLabel then return end
+    local winFrame = getWindowFrame(gui, titleLabel)
+    if winFrame and winFrame:IsA("GuiObject") then
+        winFrame.BackgroundColor3 = color
+        local parent = winFrame.Parent
+        if parent and parent:IsA("Frame") and parent.BackgroundTransparency < 1 then
+            parent.BackgroundColor3 = color
+        end
+    end
+end
+
+local function createTopPopup(gui, anchorBtn, items, onSelect, title)
+    local existing = gui:FindFirstChild("NexyroPopup")
+    if existing then existing:Destroy() end
+
+    local absPos = anchorBtn.AbsolutePosition
+    local absSize = anchorBtn.AbsoluteSize
+    local popupWidth = 200
+    local popupHeight = math.min(#items * 32 + 46, 320)
+    local screenSize = gui.AbsoluteSize
+    local x = math.max(8, math.min(absPos.X + absSize.X - popupWidth, screenSize.X - popupWidth - 8))
+    local y = math.min(absPos.Y + absSize.Y + 4, screenSize.Y - popupHeight - 8)
+
+    local popup = Instance.new("Frame")
+    popup.Name = "NexyroPopup"
+    popup.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
+    popup.BorderSizePixel = 0
+    popup.Position = UDim2.new(0, x, 0, y)
+    popup.Size = UDim2.new(0, popupWidth, 0, popupHeight)
+    popup.ZIndex = 2000
+    popup.Parent = gui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8); corner.Parent = popup
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(60, 60, 75); stroke.Thickness = 1; stroke.Parent = popup
+
+    local titleLbl = Instance.new("TextLabel")
+    titleLbl.Size = UDim2.new(1, -20, 0, 28)
+    titleLbl.Position = UDim2.new(0, 10, 0, 8)
+    titleLbl.BackgroundTransparency = 1
+    titleLbl.Text = title or "Select"
+    titleLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleLbl.Font = Enum.Font.GothamBold
+    titleLbl.TextSize = 14
+    titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+    titleLbl.ZIndex = 2001
+    titleLbl.Parent = popup
+
+    local scroller = Instance.new("ScrollingFrame")
+    scroller.Size = UDim2.new(1, -20, 1, -48)
+    scroller.Position = UDim2.new(0, 10, 0, 40)
+    scroller.BackgroundTransparency = 1
+    scroller.BorderSizePixel = 0
+    scroller.ScrollBarThickness = 3
+    scroller.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 120)
+    scroller.CanvasSize = UDim2.new(0, 0, 0, #items * 32)
+    scroller.ZIndex = 2001
+    scroller.Parent = popup
+
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 4)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = scroller
+
+    for i, item in ipairs(items) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, 0, 0, 28)
+        btn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.Text = "        " .. (item.Name or "")
+        btn.Font = Enum.Font.Gotham
+        btn.TextSize = 13
+        btn.TextXAlignment = Enum.TextXAlignment.Left
+        btn.BorderSizePixel = 0
+        btn.LayoutOrder = i
+        btn.ZIndex = 2002
+        btn.AutoButtonColor = true
+
+        local btnCorner = Instance.new("UICorner")
+        btnCorner.CornerRadius = UDim.new(0, 5); btnCorner.Parent = btn
+
+        local swatch = Instance.new("Frame")
+        swatch.Size = UDim2.new(0, 16, 0, 16)
+        swatch.Position = UDim2.new(0, 8, 0.5, -8)
+        swatch.BackgroundColor3 = item.Color
+        swatch.BorderSizePixel = 0
+        swatch.ZIndex = 2003
+        local swCorner = Instance.new("UICorner")
+        swCorner.CornerRadius = UDim.new(0, 3); swCorner.Parent = swatch
+        swatch.Parent = btn
+
+        btn.MouseButton1Click:Connect(function()
+            onSelect(item)
+            popup:Destroy()
+        end)
+        btn.Parent = scroller
+    end
+
+    task.delay(10, function()
+        if popup and popup.Parent then popup:Destroy() end
+    end)
+end
+
+local function injectTopBarControls()
+    local gui, titleLabel = findAirflowScreenGui()
+    if not gui or not titleLabel then return end
+    local exitBtn = findExitButton(gui, titleLabel)
+    if not exitBtn then return end
+    local bar = exitBtn.Parent
+    if not bar then return end
+    if bar:FindFirstChild("NexyroControls") then return end
+
+    local container = Instance.new("Frame")
+    container.Name = "NexyroControls"
+    container.BackgroundTransparency = 1
+    container.AnchorPoint = Vector2.new(1, 0.5)
+
+    local exPos, exSize, exAnchor = exitBtn.Position, exitBtn.Size, exitBtn.AnchorPoint
+    if exAnchor.X >= 0.5 then
+        container.Position = UDim2.new(exPos.X.Scale, exPos.X.Offset - exSize.X.Offset - 8, exPos.Y.Scale, exPos.Y.Offset)
+    else
+        container.Position = UDim2.new(exPos.X.Scale, exPos.X.Offset - 50, exPos.Y.Scale, exPos.Y.Offset)
+    end
+    container.Size = UDim2.new(0, 42, 0, math.max(exSize.Y.Offset, 24))
+    container.ZIndex = 999
+    container.Parent = bar
+
+    local colorBtn = Instance.new("TextButton")
+    colorBtn.Name = "ColorBtn"
+    colorBtn.Size = UDim2.new(0, 38, 1, 0)
+    colorBtn.Position = UDim2.new(0, 0, 0, 0)
+    colorBtn.BackgroundColor3 = currentBgColor
+    colorBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    colorBtn.Text = "BG"
+    colorBtn.Font = Enum.Font.GothamBold
+    colorBtn.TextSize = 14
+    colorBtn.BorderSizePixel = 0
+    colorBtn.ZIndex = 1000
+    colorBtn.AutoButtonColor = true
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 6); c.Parent = colorBtn
+    colorBtn.Parent = container
+
+    colorBtn.MouseButton1Click:Connect(function()
+        local popup = gui:FindFirstChild("NexyroPopup")
+        if popup then popup:Destroy(); return end
+        createTopPopup(gui, colorBtn, COLOR_PRESETS, function(item)
+            currentBgColor = item.Color
+            colorBtn.BackgroundColor3 = item.Color
+            applyBackgroundColor(item.Color)
+            notify("Background", "Color: " .. item.Name, "Success")
+        end, "Select Background")
+    end)
+end
+
+task.spawn(function()
+    for _ = 1, 20 do
+        task.wait(0.5)
+        pcall(injectTopBarControls)
+        local gui = findAirflowScreenGui()
+        if gui and gui:FindFirstChild("NexyroControls", true) then break end
+    end
+end)
+task.spawn(function()
+    while true do
+        task.wait(5)
+        pcall(injectTopBarControls)
+    end
+end)
+
+notify(TITLE .. " " .. VERSION, "Loaded successfully - by Nexyro " .. VERIFIED, "Success")
